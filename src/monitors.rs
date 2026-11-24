@@ -122,5 +122,42 @@ pub fn enumerate() -> Vec<ScreenInfo> {
 
 #[cfg(not(target_os = "windows"))]
 pub fn enumerate() -> Vec<ScreenInfo> {
-    Vec::new()
+    use std::process::Command;
+    let output = Command::new("xrandr").arg("--query").output()
+        .or_else(|_| Command::new("wlr-randr").output()).ok();
+    let text = output.map(|o| String::from_utf8_lossy(&o.stdout).into_owned());
+    let mut out = Vec::new();
+    if let Some(text) = text {
+        for line in text.lines() {
+            if !line.contains(" connected") { continue; }
+            let geom = line.split_whitespace().find(|t| {
+                t.starts_with(|c: char| c.is_ascii_digit()) && t.contains('x') && t.contains('+')
+            });
+            let geom = match geom { Some(g) => g, None => continue };
+            let (size, pos) = match geom.split_once('+') { Some(v) => v, None => continue };
+            let (w, h) = match size.split_once('x') { Some(v) => v, None => continue };
+            let (w, h) = match (w.parse::<u32>(), h.parse::<u32>()) {
+                (Ok(w), Ok(h)) => (w, h),
+                _ => continue,
+            };
+            let mut pos = pos.split('+');
+            let x = pos.next().and_then(|v| v.parse::<i32>().ok()).unwrap_or(0);
+            let y = pos.next().and_then(|v| v.parse::<i32>().ok()).unwrap_or(0);
+            let primary = line.contains(" primary");
+            out.push(ScreenInfo {
+                id: format!("{}x{}@{},{}", w, h, x, y),
+                name: format!("屏幕{}  {}×{}{}", out.len() + 1, w, h,
+                    if primary { " (主屏)" } else { "" }),
+                x, y, width: w, height: h, is_primary: primary,
+            });
+        }
+    }
+    if out.is_empty() {
+        out.push(ScreenInfo {
+            id: "1920x1080@0,0".into(),
+            name: "屏幕1  1920×1080 (默认)".into(),
+            x: 0, y: 0, width: 1920, height: 1080, is_primary: true,
+        });
+    }
+    out
 }

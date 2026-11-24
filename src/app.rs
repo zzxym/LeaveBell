@@ -475,6 +475,7 @@ struct SoftwareSettings {
     msg: String,
 }
 
+#[cfg(target_os = "windows")]
 // shortcut: 用 ipconfig 解析 IPv4，Windows 专有且依赖系统语言含 "IPv4" 字样
 pub(crate) fn local_ipv4s() -> Vec<String> {
     let mut ips = Vec::new();
@@ -486,6 +487,33 @@ pub(crate) fn local_ipv4s() -> Vec<String> {
                     let s = addr.to_string();
                     if !addr.is_loopback() && !ips.contains(&s) { ips.push(s); }
                 }
+            }
+        }
+    }
+    ips
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn local_ipv4s() -> Vec<String> {
+    let mut ips = Vec::new();
+    if let Ok(out) = std::process::Command::new("ip")
+        .args(["-4", "addr", "show", "scope", "global"]).output() {
+        for line in String::from_utf8_lossy(&out.stdout).lines() {
+            let line = line.trim_start();
+            if !line.starts_with("inet ") { continue; }
+            if let Some(token) = line.split_whitespace().nth(1) {
+                let addr = token.split('/').next().unwrap_or("");
+                if let Ok(v) = addr.parse::<std::net::Ipv4Addr>() {
+                    let s = v.to_string();
+                    if !ips.contains(&s) { ips.push(s); }
+                }
+            }
+        }
+    }
+    if ips.is_empty() {
+        if let Ok(out) = std::process::Command::new("hostname").arg("-I").output() {
+            for token in String::from_utf8_lossy(&out.stdout).split_whitespace() {
+                if let Ok(v) = token.parse::<std::net::Ipv4Addr>() { ips.push(v.to_string()); }
             }
         }
     }

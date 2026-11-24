@@ -1,5 +1,6 @@
 /target/
 /dist-native/
+/dist-linux/
 /patch-melo/
 /g2pW/
 /全功能无注册/
@@ -7,6 +8,7 @@
 # 发布产物与运行数据
 *.exe
 *.dll
+LeaveBell-Linux-*.tar.gz
 *.pdb
 *.onnx
 *.fst

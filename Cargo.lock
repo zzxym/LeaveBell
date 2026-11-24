@@ -2954,6 +2954,7 @@ dependencies = [
  "eframe",
  "egui",
  "embed-resource",
+ "libloading",
  "msedge-tts",
  "qrcodegen",
  "rand 0.8.8",

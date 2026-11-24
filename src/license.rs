@@ -94,7 +94,27 @@ fn physical_macs() -> Vec<String> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn physical_macs() -> Vec<String> { Vec::new() }
+fn physical_macs() -> Vec<String> {
+    let mut out = Vec::new();
+    if let Ok(entries) = fs::read_dir("/sys/class/net") {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned().to_lowercase();
+            let excluded = name == "lo"
+                || ["veth", "docker", "virbr", "tun", "tap", "wg", "br", "bond", "vm", "bluetooth"]
+                    .iter().any(|k| name.starts_with(k));
+            if excluded { continue; }
+            if let Ok(s) = fs::read_to_string(entry.path().join("address")) {
+                let mac = s.trim().to_uppercase();
+                if mac.len() == 17 && mac.matches(':').count() == 5 && mac != "00:00:00:00:00:00" {
+                    out.push(mac);
+                }
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
 
 impl MachineInfo {
     fn payload(&self, expires: &str, features: &str) -> String {

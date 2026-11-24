@@ -34,6 +34,7 @@ qrcodegen = "1.8"
 # 授权：SHA256 机器码 / Ed25519 离线许可证
 ring = "0.17"
 base64 = "0.23"
+libloading = "0.8"
 
 # Windows API（显示器枚举、网卡枚举）
 [target.'cfg(windows)'.dependencies]

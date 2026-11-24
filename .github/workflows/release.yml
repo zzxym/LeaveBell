@@ -36,3 +36,24 @@ jobs:
         with:
           files: LeaveBell-Online-Setup-*.exe
           generate_release_notes: true
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libx11-dev libasound2-dev
+
+      - name: Build package
+        run: bash build-linux.sh
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: LeaveBell-Linux-x86_64.tar.gz

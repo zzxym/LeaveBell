@@ -260,8 +260,32 @@ fn play_wav(path: &Path) -> Result<(), String> {
 }
 
 #[cfg(not(target_os = "windows"))]
+fn play_external(path: &Path, mp3: bool) -> Result<(), String> {
+    use std::process::Command;
+    let p = path.to_string_lossy();
+    let candidates: Vec<(&str, Vec<&str>)> = if mp3 {
+        vec![
+            ("ffplay", vec!["-nodisp", "-autoexit", p.as_ref()]),
+            ("mpg123", vec!["-q", p.as_ref()]),
+        ]
+    } else {
+        vec![
+            ("paplay", vec![p.as_ref()]),
+            ("aplay", vec![p.as_ref()]),
+            ("ffplay", vec!["-nodisp", "-autoexit", p.as_ref()]),
+        ]
+    };
+    for (cmd, args) in candidates {
+        if let Ok(status) = Command::new(cmd).args(args).status() {
+            if status.success() { return Ok(()); }
+        }
+    }
+    Err("未找到可用的 Linux 音频播放器（paplay/aplay/ffplay/mpg123）".to_string())
+}
+
+#[cfg(not(target_os = "windows"))]
 fn play_wav(path: &Path) -> Result<(), String> {
-    Err(format!("当前平台不支持播放: {}", path.display()))
+    play_external(path, false)
 }
 
 /// 用 Windows MCI 同步播放 MP3（PlaySoundW 不支持 MP3）
@@ -285,7 +309,7 @@ fn play_mp3(path: &Path) -> Result<(), String> {
 
 #[cfg(not(target_os = "windows"))]
 fn play_mp3(path: &Path) -> Result<(), String> {
-    Err(format!("当前平台不支持播放: {}", path.display()))
+    play_external(path, true)
 }
 
 /// 全局广播回调：(event, data) -> ()，由 main 注入，避免 voice 依赖 http_server

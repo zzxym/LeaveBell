@@ -174,24 +174,26 @@ struct SherpaApi {
     write_wave: WriteWave,
 }
 
-#[cfg(target_os = "windows")]
-static API: std::sync::OnceLock<Result<SherpaApi, String>> = std::sync::OnceLock::new();
+static API: std::sync::OnceLock<Result<(libloading::Library, SherpaApi), String>> = std::sync::OnceLock::new();
 
-#[cfg(target_os = "windows")]
 fn api() -> Result<&'static SherpaApi, String> {
-    use windows::core::PCSTR;
-    use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryA};
     API.get_or_init(|| unsafe {
-        let lib = LoadLibraryA(PCSTR(b"sherpa-onnx-c-api.dll\0".as_ptr()))
-            .map_err(|e| format!("加载 sherpa-onnx-c-api.dll 失败: {}", e))?;
+        let file = if cfg!(target_os = "windows") {
+            "sherpa-onnx-c-api.dll"
+        } else if cfg!(target_os = "macos") {
+            "libsherpa-onnx-c-api.dylib"
+        } else {
+            "libsherpa-onnx-c-api.so"
+        };
+        let lib = libloading::Library::new(file)
+            .map_err(|e| format!("加载 {} 失败: {}", file, e))?;
         macro_rules! sym {
             ($name:literal, $t:ty) => {{
-                let p = GetProcAddress(lib, PCSTR(concat!($name, "\0").as_ptr()))
-                    .ok_or_else(|| format!("缺少符号 {}", $name))?;
-                std::mem::transmute::<unsafe extern "system" fn() -> isize, $t>(p)
+                *lib.get::<$t>(concat!($name, "\0").as_bytes())
+                    .map_err(|e| format!("缺少符号 {}: {}", $name, e))?
             }};
         }
-        Ok(SherpaApi {
+        let api = SherpaApi {
             create: sym!("SherpaOnnxCreateOfflineTts", CreateTts),
             destroy: sym!("SherpaOnnxDestroyOfflineTts", DestroyTts),
             sample_rate: sym!("SherpaOnnxOfflineTtsSampleRate", TtsInt),
@@ -199,15 +201,12 @@ fn api() -> Result<&'static SherpaApi, String> {
             generate: sym!("SherpaOnnxOfflineTtsGenerateWithConfig", Generate),
             destroy_audio: sym!("SherpaOnnxDestroyOfflineTtsGeneratedAudio", DestroyAudio),
             write_wave: sym!("SherpaOnnxWriteWave", WriteWave),
-        })
+        };
+        Ok((lib, api))
     })
     .as_ref()
+    .map(|(_, api)| api)
     .map_err(Clone::clone)
-}
-
-#[cfg(not(target_os = "windows"))]
-fn api() -> Result<&'static SherpaApi, String> {
-    Err("当前平台不支持 sherpa-onnx".to_string())
 }
 
 // ---- 安全封装 ----
