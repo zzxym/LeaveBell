@@ -1,6 +1,8 @@
 /target/
 /dist-native/
 /dist-linux/
+/dist-offline/
+/offline/
 /patch-melo/
 /g2pW/
 /全功能无注册/
@@ -9,6 +11,9 @@
 *.exe
 *.dll
 LeaveBell-Linux-*.tar.gz
+LeaveBell-Online-Linux-*.tar.gz
+LeaveBell-Offline-Linux-*.tar.gz
+*.tar.bz2
 *.pdb
 *.onnx
 *.fst

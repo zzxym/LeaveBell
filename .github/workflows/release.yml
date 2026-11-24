@@ -11,49 +11,92 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            arch: amd64
+            target: x86_64-pc-windows-msvc
+            runtime: https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.6/sherpa-onnx-v1.13.6-win-x64-shared-MT-Release-lib.tar.bz2
+          - os: windows-latest
+            platform: win
+            arch: arm64
+            target: aarch64-pc-windows-msvc
+            runtime: https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.6/sherpa-onnx-v1.13.6-win-arm64-shared-MT-Release-lib.tar.bz2
+          - os: ubuntu-latest
+            platform: linux
+            arch: amd64
+            target: x86_64-unknown-linux-gnu
+            runtime: https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.6/sherpa-onnx-v1.13.6-linux-x64-shared-lib.tar.bz2
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
+            target: aarch64-unknown-linux-gnu
+            runtime: https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.6/sherpa-onnx-v1.13.6-linux-aarch64-shared-cpu-lib.tar.bz2
+    runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+          targets: ${{ matrix.target }}
 
-      - name: Build package
-        shell: pwsh
-        run: .\build-win.ps1
-
-      - name: Build online installer
-        shell: pwsh
-        run: |
-          $nsis = 'C:\Program Files (x86)\NSIS\makensis.exe'
-          if (-not (Test-Path $nsis)) { choco install nsis -y --no-progress }
-          & $nsis /V2 installer.nsi
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Get-ChildItem 'LeaveBell-Online-Setup-*.exe'
-
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: LeaveBell-Online-Setup-*.exe
-          generate_release_notes: true
-
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-
-      - name: Install system dependencies
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libx11-dev libasound2-dev
+          if [ "${{ matrix.arch }}" = "arm64" ]; then sudo apt-get install -y gcc-aarch64-linux-gnu; fi
 
-      - name: Build package
-        run: bash build-linux.sh
+      - name: Download offline assets
+        shell: bash
+        run: |
+          mkdir -p offline/runtime offline/model
+          curl -L --fail -o runtime.tar.bz2 "${{ matrix.runtime }}"
+          tar -xjf runtime.tar.bz2 -C offline/runtime
+          curl -L --fail -o model.tar.bz2 "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-melo-tts-zh_en.tar.bz2"
+          tar -xjf model.tar.bz2 -C offline/model --strip-components=1
 
-      - name: Publish release
+      - name: Build Windows packages
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+        run: |
+          .\build-win.ps1 -Target "${{ matrix.target }}" -Arch "${{ matrix.arch }}"
+          $nsis = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          if (-not (Test-Path $nsis)) { choco install nsis -y --no-progress }
+          $pkg = "dist-native\school-display-${{ matrix.arch }}"
+          & $nsis /V2 /DARCH=${{ matrix.arch }} /DPKG_DIR="$pkg" installer.nsi
+          bash build-offline.sh win ${{ matrix.arch }}
+          $offline = "dist-offline\win-${{ matrix.arch }}"
+          & $nsis /V2 /DARCH=${{ matrix.arch }} /DPKG_DIR="$offline" installer-melo-patch.nsi
+
+      - name: Build Linux packages
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+        run: |
+          bash build-linux.sh "${{ matrix.target }}" "${{ matrix.arch }}"
+          bash build-offline.sh linux "${{ matrix.arch }}"
+
+      - name: Publish Windows release
+        if: runner.os == 'Windows'
         uses: softprops/action-gh-release@v2
         with:
-          files: LeaveBell-Linux-x86_64.tar.gz
+          files: |
+            LeaveBell-Online-Setup-${{ matrix.arch }}.exe
+            LeaveBell-LocalVoice-Patch-${{ matrix.arch }}.exe
+          generate_release_notes: true
+
+      - name: Publish Linux release
+        if: runner.os == 'Linux'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            LeaveBell-Online-Linux-${{ matrix.arch }}.tar.gz
+            LeaveBell-Offline-Linux-${{ matrix.arch }}.tar.gz

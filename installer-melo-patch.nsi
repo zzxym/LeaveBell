@@ -5,9 +5,15 @@
 !define APP_VERSION "1.0.0"
 !define PATCH_NAME "LeaveBell 本地语音包补丁"
 !define REG_KEY "Software\${APP_NAME}"
+!ifndef ARCH
+!define ARCH "amd64"
+!endif
+!ifndef PKG_DIR
+!define PKG_DIR "patch-melo\payload"
+!endif
 
 Name "${PATCH_NAME}"
-OutFile "LeaveBell-LocalVoice-Patch-${APP_VERSION}.exe"
+OutFile "LeaveBell-LocalVoice-Patch-${ARCH}.exe"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 ShowInstDetails show
@@ -32,20 +38,9 @@ Section "Install Local Voice"
     ; 提示关闭正在运行的主程序，避免 exe 被占用导致替换失败
     MessageBox MB_ICONINFORMATION|MB_OK|MB_TOPMOST "安装将更新主程序与语音组件。$\r$\n请确保 LeaveBell 已完全退出（含任务栏托盘图标），再点击确定继续。"
 
-    ; 覆盖主程序（包含 sherpa-onnx 后端逻辑，必须同时更新）
+    ; 覆盖主程序 + web + 运行时 DLL + 模型
     SetOutPath "$INSTDIR"
-    File "patch-melo\payload\LeaveBell.exe"
-    ; 覆盖 web 资源（加入语音引擎选择界面）
-    SetOutPath "$INSTDIR\web"
-    File /r "patch-melo\payload\web\*"
-    ; 安装 sherpa-onnx 运行时 DLL（与主程序同目录，供 raw-dylib 运行时加载）
-    SetOutPath "$INSTDIR"
-    File "patch-melo\payload\sherpa\sherpa-onnx-c-api.dll"
-    File "patch-melo\payload\sherpa\onnxruntime.dll"
-    File "patch-melo\payload\sherpa\onnxruntime_providers_shared.dll"
-    ; 安装 MeloTTS（VITS 中文）模型
-    SetOutPath "$INSTDIR\melo"
-    File /r "patch-melo\payload\melo\*"
+    File /r "${PKG_DIR}\*"
 
     ; 标记补丁已安装
     WriteRegStr HKCU "${REG_KEY}" "LocalVoice" "1"

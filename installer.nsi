@@ -6,9 +6,15 @@
 !define APP_EXE "LeaveBell.exe"
 !define APP_PUBLISHER "School"
 !define INSTALL_DIR "D:\LeaveBell"
+!ifndef ARCH
+!define ARCH "amd64"
+!endif
+!ifndef PKG_DIR
+!define PKG_DIR "dist-native\school-display"
+!endif
 
 Name "LeaveBell 在线语音精简版"
-OutFile "LeaveBell-Online-Setup-${APP_VERSION}.exe"
+OutFile "LeaveBell-Online-Setup-${ARCH}.exe"
 InstallDir "${INSTALL_DIR}"
 InstallDirRegKey HKCU "Software\${APP_NAME}" "InstallDir"
 RequestExecutionLevel user
@@ -25,10 +31,10 @@ UninstPage instfiles
 Section "Install"
   SetOutPath "$INSTDIR"
   ; 主程序
-  File "dist-native\school-display\${APP_EXE}"
+  File "${PKG_DIR}\${APP_EXE}"
   ; 基础版只含 web / data（语音使用在线 edge-tts，无需本地运行时）
-  File /r "dist-native\school-display\web"
-  File /r "dist-native\school-display\data"
+  File /r "${PKG_DIR}\web"
+  File /r "${PKG_DIR}\data"
 
   ; 写入注册表（当前用户）
   WriteRegStr HKCU "Software\${APP_NAME}" "InstallDir" "$INSTDIR"

@@ -1,5 +1,8 @@
 # LeaveBell Native - Windows Build Script
-# Output: dist-native/school-display/ (copy entire folder to target PC)
+param(
+    [string]$Target = "",
+    [string]$Arch = "amd64"
+)
 
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
@@ -7,15 +10,18 @@ Set-Location $PSScriptRoot
 $exeName = "LeaveBell"
 
 Write-Host "== 1/3 Building release =="
-cargo build --release
+$buildArgs = @("build", "--release")
+if ($Target) { $buildArgs += @("--target", $Target) }
+& cargo @buildArgs
 if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
 
 $root = $PSScriptRoot
 $release = "E:\rust-target\release\$exeName.exe"
+if ($Target) { $release = "$PSScriptRoot\target\$Target\release\$exeName.exe" }
 if (-not (Test-Path $release)) { $release = "$PSScriptRoot\target\release\$exeName.exe" }
 if (-not (Test-Path $release)) { Write-Error "Release exe not found"; exit 1 }
 
-$out = Join-Path $PSScriptRoot "dist-native\school-display"
+$out = Join-Path $PSScriptRoot "dist-native\school-display-$Arch"
 # 基础版只含 edge-tts（在线），不打包 piper；它由本地语音包补丁提供
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 New-Item -ItemType Directory -Path $out -Force | Out-Null

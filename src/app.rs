@@ -2,7 +2,7 @@ use crate::http_server::set_status_locked;
 use crate::model::Store;
 use crate::monitors::{ScreenConfig, ScreenInfo};
 use eframe::egui;
-use egui::{Color32, Context, Pos2, Vec2, ViewportBuilder, ViewportCommand, ViewportId};
+use egui::{Color32, Context, Pos2, Vec2, ViewportBuilder, ViewportCommand, ViewportId, WindowLevel};
 use serde_json::Value;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
@@ -623,6 +623,7 @@ pub struct App {
     license_state: Arc<Mutex<crate::license::LicenseState>>,
     reg_open: bool,
     reg_msg: String,
+    last_ontop: Option<bool>,
 }
 
 impl App {
@@ -683,6 +684,7 @@ impl App {
             license_state,
             reg_open: false,
             reg_msg: String::new(),
+            last_ontop: None,
         }
     }
 
@@ -1004,6 +1006,19 @@ impl eframe::App for App {
         if trial_expired {
             self.render_trial_expired(ctx);
             return;
+        }
+        // 单屏或两个窗口在同一屏幕时，控制器置顶；用户可自行最小化到任务栏
+        let same_screen = {
+            let cfg = self.screen_cfg.lock().unwrap();
+            let display = cfg.display_screen().unwrap_or("");
+            let controller = cfg.controller_screen().unwrap_or("");
+            self.screens.len() < 2 || display.is_empty() || controller.is_empty() || display == controller
+        };
+        if self.last_ontop != Some(same_screen) {
+            ctx.send_viewport_cmd(ViewportCommand::WindowLevel(
+                if same_screen { WindowLevel::AlwaysOnTop } else { WindowLevel::Normal },
+            ));
+            self.last_ontop = Some(same_screen);
         }
         self.render_controller(ctx);
         self.render_registration(ctx);
