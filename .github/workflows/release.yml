@@ -251,12 +251,13 @@ jobs:
             Assert-File $dll
             Assert-File $model
             if ($arch -eq 'amd64') {
-              $dir = Split-Path $onlineExe
+              $exePath = (Resolve-Path $onlineExe).Path
+              $dir = Split-Path $exePath
               $result = Join-Path $dir 'license-tool-result.txt'
               Remove-Item $result -ErrorAction SilentlyContinue
               Push-Location $dir
               try {
-                & $onlineExe --license-check
+                & $exePath --license-check
                 $code = $LASTEXITCODE
               } finally { Pop-Location }
               if ($code -ne 0) { throw "license-check failed: $onlineExe" }
