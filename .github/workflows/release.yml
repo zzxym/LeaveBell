@@ -127,8 +127,82 @@ jobs:
             LeaveBell-Online-${{ matrix.arch }}.rpm
           if-no-files-found: error
 
+  verify-linux:
+    needs: build-linux
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: linux-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Install verification tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm libxkbcommon0 libwayland-client0 libx11-6 libasound2t64 || sudo apt-get install -y rpm libxkbcommon0 libwayland-client0 libx11-6 libasound2
+
+      - name: Verify Linux archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          for arch in amd64 arm64; do
+            online_tar="artifacts/LeaveBell-Online-Linux-$arch.tar.gz"
+            offline_tar="artifacts/LeaveBell-Offline-Linux-$arch.tar.gz"
+            test -f "$online_tar"
+            test -f "$offline_tar"
+            rm -rf "online-$arch" "offline-$arch"
+            mkdir -p "online-$arch" "offline-$arch"
+            tar -xzf "$online_tar" -C "online-$arch"
+            tar -xzf "$offline_tar" -C "offline-$arch"
+            on="online-$arch/LeaveBell-$arch"
+            off="offline-$arch/linux-$arch"
+            test -x "$on/LeaveBell"
+            test -f "$on/LeaveBell.bin"
+            test -x "$off/LeaveBell"
+            test -f "$off/LeaveBell.bin"
+            test -f "$off/libsherpa-onnx-c-api.so"
+            test -f "$off/melo/models/sherpa-onnx-vits-zh-ll/model.onnx"
+            if [ "$arch" = "amd64" ]; then
+              (cd "$on" && timeout 30 ./LeaveBell --license-check)
+              grep -q '^registered=' "$on/license-tool-result.txt"
+              rm -f "$on/license-tool-result.txt"
+              (cd "$off" && timeout 30 ./LeaveBell --license-check)
+              grep -q '^registered=' "$off/license-tool-result.txt"
+              rm -f "$off/license-tool-result.txt"
+              if ldd "$on/LeaveBell.bin" | grep -q 'not found'; then echo "missing shared library in $on"; exit 1; fi
+              if ldd "$off/LeaveBell.bin" | grep -q 'not found'; then echo "missing shared library in $off"; exit 1; fi
+            else
+              file "$on/LeaveBell.bin" | grep -q 'aarch64'
+              file "$off/LeaveBell.bin" | grep -q 'aarch64'
+            fi
+          done
+
+      - name: Verify Linux packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pkg in artifacts/LeaveBell-*.deb artifacts/LeaveBell-*.rpm; do
+            case "$pkg" in
+              *.deb) dpkg-deb -c "$pkg" >/dev/null; dpkg-deb -f "$pkg" Architecture | grep -q . ;;
+              *.rpm) rpm -qlp "$pkg" >/dev/null; rpm -qp --qf '%{ARCH}\n' "$pkg" | grep -q . ;;
+            esac
+            case "$pkg" in
+              *.deb) list=$(dpkg-deb -c "$pkg") ;;
+              *.rpm) list=$(rpm -qlp "$pkg") ;;
+            esac
+            case "$pkg" in
+              *Online-*)
+                if echo "$list" | grep -q 'model.onnx'; then echo "online package contains offline model: $pkg"; exit 1; fi ;;
+              *)
+                echo "$list" | grep -q 'model.onnx'
+                echo "$list" | grep -q 'libsherpa-onnx-c-api.so' ;;
+            esac
+          done
+
   release:
-    needs: [build-win, build-linux]
+    needs: [build-win, build-linux, verify-linux]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
 
