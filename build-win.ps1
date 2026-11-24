@@ -23,7 +23,12 @@ New-Item -ItemType Directory -Path (Join-Path $out "web") -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $out "data") -Force | Out-Null
 $presetData = Join-Path $PSScriptRoot "dist\school-display\data\data.json"
 if (-not (Test-Path $presetData)) { $presetData = Join-Path $PSScriptRoot "preset\data.json" }
-Copy-Item $presetData (Join-Path $out "data\data.json") -Force
+if (Test-Path $presetData) {
+    Copy-Item $presetData (Join-Path $out "data\data.json") -Force
+} else {
+    # 首次启动由 Store::load 自动补齐全部默认字段
+    [System.IO.File]::WriteAllText((Join-Path $out "data\data.json"), "{}", (New-Object System.Text.UTF8Encoding($false)))
+}
 
 Write-Host "== 2/3 Copying files =="
 Copy-Item $release (Join-Path $out "$exeName.exe")
