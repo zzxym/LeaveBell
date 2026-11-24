@@ -1003,10 +1003,6 @@ impl eframe::App for App {
             }
             l.expired
         };
-        if trial_expired {
-            self.render_trial_expired(ctx);
-            return;
-        }
         // 单屏或两个窗口在同一屏幕时，控制器置顶；用户可自行最小化到任务栏
         let same_screen = {
             let cfg = self.screen_cfg.lock().unwrap();
@@ -1019,6 +1015,10 @@ impl eframe::App for App {
                 if same_screen { WindowLevel::AlwaysOnTop } else { WindowLevel::Normal },
             ));
             self.last_ontop = Some(same_screen);
+        }
+        if trial_expired {
+            self.render_trial_expired(ctx);
+            return;
         }
         self.render_controller(ctx);
         self.render_registration(ctx);

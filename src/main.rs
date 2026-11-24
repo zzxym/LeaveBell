@@ -166,12 +166,19 @@ fn main() -> eframe::Result {
         eframe::icon_data::from_png_bytes(include_bytes!("../assets/app-icon.png"))
             .expect("窗口图标加载失败"),
     );
+    let controller_on_top = {
+        let cfg = screen_cfg.lock().unwrap();
+        let display = cfg.display_screen().unwrap_or("");
+        let controller = cfg.controller_screen().unwrap_or("");
+        screens.len() < 2 || display.is_empty() || controller.is_empty() || display == controller
+    };
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("放学系统 · 本地控制器")
             .with_inner_size([1100.0, 820.0])
             .with_min_inner_size([640.0, 480.0])
-            .with_icon(icon),
+            .with_icon(icon)
+            .with_window_level(if controller_on_top { egui::WindowLevel::AlwaysOnTop } else { egui::WindowLevel::Normal }),
         ..Default::default()
     };
 
