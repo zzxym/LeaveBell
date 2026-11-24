@@ -2,6 +2,8 @@
 /dist-native/
 /dist-linux/
 /dist-offline/
+/dist-packages/
+/rpmbuild/
 /offline/
 /patch-melo/
 /g2pW/
@@ -14,6 +16,8 @@ LeaveBell-Linux-*.tar.gz
 LeaveBell-Online-Linux-*.tar.gz
 LeaveBell-Offline-Linux-*.tar.gz
 *.tar.bz2
+*.deb
+*.rpm
 *.pdb
 *.onnx
 *.fst

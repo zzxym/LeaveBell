@@ -19,7 +19,7 @@ mkdir -p "$out/web" "$out/data"
 cp "$bin" "$out/LeaveBell.bin"
 cat > "$out/LeaveBell" <<'EOF'
 #!/usr/bin/env bash
-DIR="$(cd "$(dirname "$0")" && pwd)"
+DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 export LD_LIBRARY_PATH="$DIR:${LD_LIBRARY_PATH:-}"
 exec "$DIR/LeaveBell.bin" "$@"
 EOF

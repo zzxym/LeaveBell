@@ -48,7 +48,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libx11-dev libasound2-dev
+          sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libx11-dev libasound2-dev rpm
           if [ "${{ matrix.arch }}" = "arm64" ]; then sudo apt-get install -y gcc-aarch64-linux-gnu; fi
 
       - name: Download offline assets
@@ -83,6 +83,7 @@ jobs:
         run: |
           bash build-linux.sh "${{ matrix.target }}" "${{ matrix.arch }}"
           bash build-offline.sh linux "${{ matrix.arch }}"
+          bash build-linux-packages.sh "${{ matrix.arch }}"
 
       - name: Publish Windows release
         if: runner.os == 'Windows'
@@ -100,3 +101,5 @@ jobs:
           files: |
             LeaveBell-Online-Linux-${{ matrix.arch }}.tar.gz
             LeaveBell-Offline-Linux-${{ matrix.arch }}.tar.gz
+            LeaveBell-${{ matrix.arch }}.deb
+            LeaveBell-${{ matrix.arch }}.rpm
