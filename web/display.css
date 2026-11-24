@@ -1,0 +1,223 @@
+/* 大屏显示样式
+ * 仅由 display.html（大屏端）与 admin.html 的大屏预览引入。
+ * 不影响老师端、登录页与管理端其他部分。
+ *
+ * 依赖 style.css 中定义的 --sw / --sh / --cols / --card-w / --card-h 变量。
+ * 下列可调项由管理端「大屏高级设置」表单下发的 CSS 变量控制，均带默认值：
+ * --card-radius / --card-padding / --card-gap / --card-border-alpha / --card-font
+ * --name-scale / --status-scale / --time-scale / --*-weight
+ * --s0-bg/--s0-text、--s1-bg/--s1-text/--s1-marquee、--s2-bg/--s2-text
+ * --card-dir / --meta-dir（后两者控制排版排数）
+ */
+
+/* 卡片网格：列数由设置的 cols 控制，班级自动对齐；一页放不下时由程序自动翻页，不依赖鼠标滚动 */
+.cards {
+  flex: 1;
+  display: grid;
+  /* 班级块宽度：设了 --card-w 则固定每列宽度，否则 1fr 均分；minmax(0,..) 允许收缩防溢出 */
+  grid-template-columns: repeat(var(--cols, 4), minmax(0, var(--card-w, 1fr)));
+  /* 所有行等高均分画布，与大屏一致：卡片铺满且不溢出 */
+  grid-auto-rows: minmax(0, 1fr);
+  /* 固定像素间距：画布整体等比缩放时，间距也随之等比缩放，保证所见即所得 */
+  gap: 8px;
+  align-content: stretch;
+  padding-top: calc(var(--sh, 1080px) * 0.02);
+  overflow: hidden;
+}
+
+.card {
+  /* 以下可调项由管理端「大屏高级设置」下发的 CSS 变量控制，均带默认值 */
+  border-radius: var(--card-radius, 10px);
+  padding: 4px;
+  display: flex;
+  /* 排版方向由「大屏高级设置」下发的变量控制：column=三排/两排，row=一排 */
+  flex-direction: var(--card-dir, column);
+  /* 卡片内容横向居中，配合名称的 fit-content 宽度实现自适应填充 */
+  align-items: center;
+  gap: 4px;
+  /* 与原生大屏一致：普通卡片不描边 */
+  border: 0;
+  font-family: var(--card-font, inherit);
+  /* 班级块高度：设了 --card-h 则固定，否则自适应；min-height 设下限保证文字有空间 */
+  height: var(--card-h, auto);
+  min-height: 48px;
+  /* 文字字号一律用固定像素（与大屏 egui 绘制一致）。画布本身按分辨率整体等比缩放，
+     因此固定像素字号会随画布一起缩放，预览与真机所见即所得；绝不能用 cqw/容器查询，
+     那会让字号相对卡片宽度放大，导致文字溢出重叠、比例失真 */
+  overflow: hidden;
+  text-align: center;
+  justify-content: center;
+  /* 单色 LED 屏友好：基础黑底白字 */
+  background: #000;
+  color: #fff;
+}
+/* 班级名：固定像素字号，与大屏 nameScale 一致。nowrap + fit-content：
+   不折行，元素宽度即为文字实际宽度，供 JS 在超宽时等比缩小防裁切 */
+.card .card-name {
+  font-size: calc(var(--name-scale, 28) * 1px);
+  font-weight: var(--name-weight, 800);
+  line-height: 1.12;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  width: fit-content;
+  max-width: 100%;
+}
+/* 空占位卡片：管理员预留的空白位置，仅描边示意 */
+.card.empty {
+  background: #000;
+  border: 1px dashed rgba(255, 255, 255, 0.28);
+}
+/* 状态与时间的排布容器：由排版配置决定竖排或横排 */
+.card-meta {
+  display: flex;
+  flex-direction: var(--meta-dir, column);
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+}
+/* 一排模式下三项文字同排：保持各自宽度、不换行，避免状态被挤成竖排 */
+.card-meta > * {
+  flex: none;
+  white-space: nowrap;
+}
+/* 三排：状态与时间竖排在 meta 内；二排：状态与时间横排在 meta 内 */
+.card-meta.meta-col { flex-direction: column; }
+.card-meta.meta-row { flex-direction: row; }
+.card .card-status {
+  /* 固定像素字号，与大屏 statusScale 一致 */
+  font-size: calc(var(--status-scale, 28) * 1px);
+  font-weight: var(--status-weight, 700);
+  line-height: 1.1;
+}
+.card .card-time {
+  /* 固定像素字号，与大屏 timeScale 一致 */
+  font-size: calc(var(--time-scale, 28) * 1px);
+  font-weight: var(--time-weight, 600);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+/* 未放学：底色与文字色均可配置 */
+.card.s0 { background: var(--s0-bg, #000); }
+.card.s0 .card-name, .card.s0 .card-status, .card.s0 .card-time { color: var(--s0-text, #fff); }
+/* 开始放学：静态底色，不使用底色填充动画 */
+.card.s1 {
+  background: var(--s1-bg, #000);
+  position: relative;
+  overflow: hidden;
+}
+.card.s1 .card-name, .card.s1 .card-status, .card.s1 .card-time {
+  position: relative;
+  z-index: 1;
+}
+/* 放学文字跑马：渐变承载在状态与时间的共同容器上，使颜色从状态连续扫到时间，
+   而不是两段文字各自独立跑马。三排/两排下顶排（班级名）保持静止。
+   1.5 秒匀速循环；背景宽度与位置移动距离严格相等（一个完整周期），循环点完全重合，无累积相位偏差与顿挫。 */
+.card.s1 .card-name {
+  color: var(--s1-text, #fff);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+.card.s1 .card-meta {
+  background-image: linear-gradient(90deg,
+    var(--s1-text, #fff) 0%, var(--s1-text, #fff) 20%,
+    var(--s1-marquee, #fbbf24) 42%, var(--s1-marquee, #fbbf24) 58%,
+    var(--s1-text, #fff) 80%, var(--s1-text, #fff) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: s1-text-run 1.5s linear infinite;
+}
+/* 配置渐变启用时，关闭旧的内置跑马，避免与新渐变叠加冲突 */
+.gd-bg .card-meta,
+.card:has(.gd-elem) .card-meta {
+  background-image: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: inherit;
+  animation: none;
+}
+.card.s1 .card-status,
+.card.s1 .card-time {
+  color: inherit;
+}
+/* 一排模式：班级名已放入同一 meta 容器，继承整排共享的渐变跑马，不再独立动画 */
+.card.s1.run-marquee-all .card-name {
+  color: inherit;
+  text-shadow: none;
+}
+@keyframes s1-text-run {
+  from { background-position: 100% 0; }
+  to   { background-position: -100% 0; }
+}
+/* 可接走：全绿底色 */
+.card.s2 { background: var(--s2-bg, #22c55e); }
+.card.s2 .card-name, .card.s2 .card-status, .card.s2 .card-time { color: var(--s2-text, #0a3d1d); }
+
+/* ===== 可配置渐变效果（管理端「状态/倒计时渐变效果」） =====
+   变量由 index.html / set.html 的 gradientVars() 按状态下发：
+   --gd0-*(上课) / --gd1-*(出教室) / --gd2-*(抵达校门)。
+   目标类：gd-bg 底色；gd-elem 作用于文字/班级标签/倒计时。 */
+.gd-bg {
+  background-image: var(--gd-img, none) !important;
+  background-size: var(--gd-size, 100% 100%);
+  animation: var(--gd-anim, none) var(--gd-dur, 1.5s) linear var(--gd-iter, infinite);
+}
+.card .gd-elem {
+  background-image: var(--gd-img, none);
+  background-size: var(--gd-size, 100% 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  text-shadow: none;
+  animation: var(--gd-anim, none) var(--gd-dur, 1.5s) linear var(--gd-iter, infinite);
+}
+/* 各状态使用各自的渐变变量 */
+.card.s0.gd-bg { background-image: var(--gd0-img, none) !important; background-size: var(--gd0-size, 100% 100%); animation: var(--gd0-anim, none) var(--gd0-dur, 1.5s) linear var(--gd0-iter, infinite); }
+.card.s1.gd-bg { background-image: var(--gd1-img, none) !important; background-size: var(--gd1-size, 100% 100%); animation: var(--gd1-anim, none) var(--gd1-dur, 1.5s) linear var(--gd1-iter, infinite); }
+.card.s2.gd-bg { background-image: var(--gd2-img, none) !important; background-size: var(--gd2-size, 100% 100%); animation: var(--gd2-anim, none) var(--gd2-dur, 1.5s) linear var(--gd2-iter, infinite); }
+.card.s0 .gd-elem { background-image: var(--gd0-img, none); background-size: var(--gd0-size, 100% 100%); animation: var(--gd0-anim, none) var(--gd0-dur, 1.5s) linear var(--gd0-iter, infinite); }
+.card.s1 .gd-elem { background-image: var(--gd1-img, none); background-size: var(--gd1-size, 100% 100%); animation: var(--gd1-anim, none) var(--gd1-dur, 1.5s) linear var(--gd1-iter, infinite); }
+.card.s2 .gd-elem { background-image: var(--gd2-img, none); background-size: var(--gd2-size, 100% 100%); animation: var(--gd2-anim, none) var(--gd2-dur, 1.5s) linear var(--gd2-iter, infinite); }
+@keyframes gd-x {
+  from { background-position: 0% 50%; }
+  to   { background-position: 100% 50%; }
+}
+@keyframes gd-x-rev {
+  from { background-position: 100% 50%; }
+  to   { background-position: 0% 50%; }
+}
+@keyframes gd-y {
+  from { background-position: 50% 0%; }
+  to   { background-position: 50% 100%; }
+}
+@keyframes gd-y-rev {
+  from { background-position: 50% 100%; }
+  to   { background-position: 50% 0%; }
+}
+
+/* 语音播报中：虚线边框 + 顺时针跑马灯 */
+.card.speaking { position: relative; }
+.card.speaking::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 3px;
+  background: conic-gradient(from var(--voice-angle, 0deg),
+    transparent 0deg, transparent 300deg, #fff06a 320deg, #fffbe0 350deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: voice-spin 1.6s linear infinite;
+}
+@keyframes voice-spin {
+  from { --voice-angle: 0deg; }
+  to   { --voice-angle: 360deg; }
+}
+@property --voice-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}

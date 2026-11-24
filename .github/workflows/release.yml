@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Build package
+        shell: pwsh
+        run: .\build-win.ps1
+
+      - name: Build online installer
+        shell: pwsh
+        run: |
+          $nsis = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          if (-not (Test-Path $nsis)) { choco install nsis -y --no-progress }
+          & $nsis /V2 installer.nsi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem 'LeaveBell-Online-Setup-*.exe'
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: LeaveBell-Online-Setup-*.exe
+          generate_release_notes: true

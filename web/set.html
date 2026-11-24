@@ -1,0 +1,1707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>管理端</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/display.css">
+</head>
+<body class="app">
+  <main class="app-main wide">
+    <!-- 登录门 -->
+    <section id="login" class="panel">
+      <div class="panel-inner">
+        <h1>管理端登录</h1>
+        <input id="pwd" type="password" placeholder="管理密码" autocomplete="off">
+        <button id="loginBtn" class="btn btn-primary btn-block">登录</button>
+        <p id="loginMsg" class="msg"></p>
+      </div>
+    </section>
+
+    <!-- 主界面 -->
+    <div id="main" class="hidden">
+      <div class="module-bar">
+        <div class="module-tabs" id="moduleBar">
+          <button class="module-tab active" data-module="overview">状态总览</button>
+          <button class="module-tab" data-module="classes">班级管理</button>
+          <button class="module-tab" data-module="display">显示设置</button>
+          <button class="module-tab" data-module="voice">语音设置</button>
+          <button class="module-tab" data-module="style">高级设置</button>
+          <button class="module-tab" data-module="schedule">定时任务</button>
+          <button class="module-tab" data-module="scan">扫码</button>
+          <button class="module-tab" data-module="pwd">修改密码</button>
+        </div>
+        <button id="logout" class="btn btn-ghost">退出</button>
+      </div>
+      <div class="cards-grid">
+        <section class="panel" id="panel-overview">
+          <header class="panel-head">
+            <h1>状态总览</h1>
+            <div class="panel-actions">
+              <button id="refresh" class="btn btn-ghost">刷新</button>
+            </div>
+          </header>
+
+          <div class="tab-bar" id="tabBar">
+            <button class="tab active" data-status="0"><span class="tab-name"></span> <span class="tab-cnt" id="cnt0">0</span></button>
+            <button class="tab" data-status="1"><span class="tab-name"></span> <span class="tab-cnt" id="cnt1">0</span></button>
+            <button class="tab" data-status="2"><span class="tab-name"></span> <span class="tab-cnt" id="cnt2">0</span></button>
+          </div>
+
+          <div class="ov-cards" id="rows"></div>
+          <p class="hint" id="ovCycleHint"></p>
+        </section>
+
+        <section class="panel hidden" id="panel-classes">
+          <header class="panel-head">
+            <h1>班级管理</h1>
+          </header>
+
+        <div class="class-add">
+          <div class="class-add-fields">
+            <label class="field">
+              <span>年级</span>
+              <select id="nGrade"></select>
+            </label>
+            <label class="field">
+              <span>班级号</span>
+              <input id="nNum" type="number" min="1" max="99" placeholder="如 8">
+            </label>
+          </div>
+          <div class="class-add-preview">
+            将创建：<b id="nPreview">—</b>
+          </div>
+          <button id="addClassBtn" class="btn btn-primary">添加班级</button>
+        </div>
+        <p class="hint">按年级 + 班级号自动生成编号与名称。点击班级可展开管理该班教师账号；删除班级会同时解绑该班所有老师。</p>
+
+        <div id="classGroups" class="class-groups"></div>
+      </section>
+
+      <section class="panel hidden" id="panel-schedule">
+        <header class="panel-head">
+          <h1>定时任务</h1>
+          <div class="panel-actions">
+            <button id="schedSave" class="btn btn-primary">保存配置</button>
+          </div>
+        </header>
+
+        <p class="hint">每个定时器在设定时间到达时，自动将所有班级重置为初始状态（状态1）。可独立启用/禁用、设置触发时间，并查看各自执行状态。</p>
+
+        <div class="timer-list" id="timerList"></div>
+
+        <p id="schedMsg" class="msg"></p>
+      </section>
+
+      <section class="panel hidden" id="panel-display">
+        <header class="panel-head">
+          <h1>大屏显示设置</h1>
+          <div class="panel-actions">
+            <button id="dsAddBlank" class="btn btn-ghost">添加空卡片</button>
+            <button id="dsConfirm" class="btn btn-primary">保存设置</button>
+          </div>
+        </header>
+
+        <div class="display-set-row">
+          <label class="field">
+            <span>每行班级数</span>
+            <input id="dsCols" type="number" min="1" max="20">
+          </label>
+          <label class="field">
+            <span>班级块宽度(px)</span>
+            <input id="dsCardW" type="number" min="0" max="7680" step="1" placeholder="0=自动">
+          </label>
+          <label class="field">
+            <span>班级块高度(px)</span>
+            <input id="dsCardH" type="number" min="0" max="4320" step="1" placeholder="0=自动">
+          </label>
+          <label class="field">
+            <span>班级名格式</span>
+            <select id="dsNameFmt">
+              <option value="cn">一（1）</option>
+              <option value="full">一年1班</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>状态1名称</span>
+            <input id="dsLabel0" type="text" maxlength="8" placeholder="上课">
+          </label>
+          <label class="field">
+            <span>状态2名称</span>
+            <input id="dsLabel1" type="text" maxlength="8" placeholder="出教室">
+          </label>
+          <label class="field">
+            <span>状态3名称</span>
+            <input id="dsLabel2" type="text" maxlength="8" placeholder="抵达校门">
+          </label>
+        </div>
+        <div id="dsPreview" class="ds-preview"></div>
+      </section>
+
+      <section class="panel hidden" id="panel-style">
+        <header class="panel-head">
+          <h1>大屏高级设置</h1>
+          <div class="panel-actions">
+            <button id="styleRevert" class="btn btn-ghost">放弃修改</button>
+            <button id="styleSave" class="btn btn-primary">保存设置</button>
+          </div>
+        </header>
+
+        <p class="hint">通过表单配置大屏显示，保存后大屏端与下方预览同步生效。覆盖「大屏显示设置」的全部内容，并可扩展卡片内文字大小、字体与粗细、状态颜色。</p>
+
+        <div class="adv-grid">
+          <fieldset>
+            <legend>卡片外观</legend>
+            <p class="hint">三排：名称/状态/时间各占一排；两排：状态与时间同排；一排：三者同排。</p>
+            <label class="field"><span>卡片排版</span>
+              <select id="advLayout"><option value="3">三排</option><option value="2">两排</option><option value="1">一排</option></select>
+            </label>
+            <label class="field"><span>圆角 (px)</span><input id="advRadius" type="number" min="0" max="60"></label>
+            <label class="field"><span>边框透明度</span><input id="advBorderAlpha" type="number" min="0" max="1" step="0.01"></label>
+            <label class="field"><span>内边距 (cqw)</span><input id="advPadding" type="number" min="0" max="3" step="0.1"></label>
+            <label class="field"><span>层间距 (cqw)</span><input id="advGap" type="number" min="0" max="4" step="0.1"></label>
+          </fieldset>
+
+          <fieldset>
+            <legend>文字大小（cqw 系数）</legend>
+            <label class="field"><span>班级名</span><span class="range-wrap"><input id="advNameScale" type="range" min="8" max="60" step="0.5"><input id="advNameScaleNum" class="range-num" type="number" min="8" max="60" step="0.5" value="60"></span></label>
+            <label class="field"><span>状态</span><span class="range-wrap"><input id="advStatusScale" type="range" min="6" max="40" step="0.5"><input id="advStatusScaleNum" class="range-num" type="number" min="6" max="40" step="0.5" value="28"></span></label>
+            <label class="field"><span>时间</span><span class="range-wrap"><input id="advTimeScale" type="range" min="5" max="35" step="0.5"><input id="advTimeScaleNum" class="range-num" type="number" min="5" max="35" step="0.5" value="28"></span></label>
+          </fieldset>
+
+          <fieldset>
+            <legend>字体与粗细</legend>
+            <label class="field"><span>字体</span>
+              <select id="advFont">
+                <option value="">系统默认</option>
+                <option value='Microsoft YaHei, "微软雅黑", sans-serif'>微软雅黑</option>
+                <option value='SimHei, "黑体", sans-serif'>黑体</option>
+                <option value='SimSun, "宋体", serif'>宋体</option>
+                <option value='Consolas, "Courier New", monospace'>等宽字体</option>
+              </select>
+            </label>
+            <label class="field"><span>班级名粗细</span><span class="range-wrap"><input id="advNameWeight" type="range" min="100" max="900" step="100"><output id="advNameWeightOut">800</output></span></label>
+            <label class="field"><span>状态粗细</span><span class="range-wrap"><input id="advStatusWeight" type="range" min="100" max="900" step="100"><output id="advStatusWeightOut">700</output></span></label>
+            <label class="field"><span>时间粗细</span><span class="range-wrap"><input id="advTimeWeight" type="range" min="100" max="900" step="100"><output id="advTimeWeightOut">600</output></span></label>
+          </fieldset>
+
+          <fieldset>
+            <legend>状态颜色</legend>
+            <label class="field"><span id="lblS0Bg"></span><input id="advS0Bg" type="color"></label>
+            <label class="field"><span id="lblS0Text"></span><input id="advS0Text" type="color"></label>
+            <label class="field"><span id="lblS1Bg"></span><input id="advS1Bg" type="color"></label>
+            <label class="field"><span id="lblS1Text"></span><input id="advS1Text" type="color"></label>
+            <label class="field"><span id="lblS1Marquee"></span><input id="advS1Marquee" type="color"></label>
+            <label class="field"><span id="lblS2Bg"></span><input id="advS2Bg" type="color"></label>
+            <label class="field"><span id="lblS2Text"></span><input id="advS2Text" type="color"></label>
+          </fieldset>
+
+          <fieldset>
+            <legend>画布与卡片尺寸</legend>
+            <label class="field"><span>每行班级数</span><input id="advCols" type="number" min="1" max="20"></label>
+            <label class="field"><span>卡片块宽 (px, 0=自动)</span><input id="advCardW" type="number" min="0"></label>
+            <label class="field"><span>卡片块高 (px, 0=自动)</span><input id="advCardH" type="number" min="0"></label>
+          </fieldset>
+
+          <fieldset>
+            <legend>班级排序</legend>
+            <p class="hint">逗号分隔的班级编号，空段表示空白占位，例如：<code>101,102,,103</code>。与「大屏显示设置」的拖拽排序双向同步。</p>
+            <textarea id="advOrder" class="order-editor" rows="7" spellcheck="false"></textarea>
+          </fieldset>
+
+          <fieldset style="grid-column:1/-1">
+            <legend>状态 / 倒计时渐变效果</legend>
+            <div class="gd-tabs" id="gdTabs">
+              <button type="button" class="gd-tab active" data-status="0"><span class="gd-tab-name"></span></button>
+              <button type="button" class="gd-tab" data-status="1"><span class="gd-tab-name"></span></button>
+              <button type="button" class="gd-tab" data-status="2"><span class="gd-tab-name"></span></button>
+            </div>
+            <p class="hint gd-tab-hint">当前编辑：<b id="gdCurLabel"></b> 状态的渐变效果</p>
+            <div class="adv-grid" style="margin:0">
+              <label class="field"><span>启用渐变效果</span>
+                <select id="gdEnabled"><option value="1">开启</option><option value="0">关闭</option></select>
+              </label>
+              <label class="field"><span>渐变模式</span>
+                <select id="gdMode"><option value="flow">动画流动渐变</option><option value="static">静态渐变</option></select>
+              </label>
+              <label class="field"><span>渐变类型</span>
+                <select id="gdKind"><option value="linear">线性</option><option value="radial">径向</option></select>
+              </label>
+              <div class="field"><span class="gd-target-title">效果目标（多选）</span>
+                <div class="gd-targets">
+                  <label><input type="checkbox" value="bg" class="gd-target"><span>底色</span></label>
+                  <label><input type="checkbox" value="text" class="gd-target"><span>文字</span></label>
+                  <label><input type="checkbox" value="name" class="gd-target"><span>班级标签</span></label>
+                  <label><input type="checkbox" value="time" class="gd-target"><span>倒计时</span></label>
+                </div>
+              </div>
+              <label class="field"><span>起始颜色</span><input id="gdStart" type="color"></label>
+              <label class="field"><span>结束颜色</span><input id="gdEnd" type="color"></label>
+              <label class="field"><span>渐变中点 <output id="gdMidOut"></output></span><input id="gdMid" type="range" min="0" max="100" step="1"></label>
+              <label class="field"><span>透明度 <output id="gdOpacityOut"></output></span><input id="gdOpacity" type="range" min="0" max="100" step="1"></label>
+              <label class="field"><span>流动方向</span>
+                <select id="gdDirection">
+                  <option value="ltr">左 → 右</option><option value="rtl">右 → 左</option>
+                  <option value="ttb">上 → 下</option><option value="btt">下 → 上</option>
+                </select>
+              </label>
+              <label class="field"><span>循环方式</span>
+                <select id="gdLoop"><option value="loop">单向循环</option><option value="pingpong">往返往复</option></select>
+              </label>
+              <label class="field"><span>流动周期 <output id="gdPeriodOut"></output></span><input id="gdPeriod" type="range" min="0.1" max="20" step="0.1"></label>
+              <label class="field"><span>渐变延展长度 <output id="gdSpreadOut"></output></span><input id="gdSpread" type="range" min="100" max="500" step="10"></label>
+            </div>
+          </fieldset>
+        </div>
+
+        <p id="styleMsg" class="msg"></p>
+      </section>
+
+      <section class="panel hidden" id="panel-scan">
+        <header class="panel-head">
+          <h1>扫码放学</h1>
+          <div class="panel-actions">
+            <button id="scanRefresh" class="btn btn-ghost">刷新</button>
+          </div>
+        </header>
+
+        <p class="hint">打印下方二维码张贴在教室或校门口。老师用手机扫码后选择班级即可操作放学（状态0→下课放学，状态1→到达校门，状态2已完成）。</p>
+
+        <div class="adv-grid">
+          <fieldset>
+            <legend>扫码服务器地址</legend>
+            <div class="field">
+              <span>内网地址</span>
+              <input id="scanServer" type="text" placeholder="如 http://192.168.1.100:9000">
+            </div>
+            <p class="hint">二维码内容为该地址。留空则按访问时的主机头自动生成。请填内网可达的地址。</p>
+            <button id="scanServerSave" class="btn btn-primary">保存地址</button>
+            <p id="scanServerMsg" class="msg"></p>
+          </fieldset>
+          <fieldset>
+            <legend>扫码二维码</legend>
+            <div id="scanQrBox" style="display:flex;justify-content:center;align-items:center;min-height:200px;border:1px solid #e5e7eb;border-radius:8px;padding:16px;background:#fff;">
+              <img id="scanQrImg" alt="扫码二维码" style="display:none;">
+              <span id="scanQrHint" class="muted">正在生成二维码…</span>
+            </div>
+            <p class="hint" style="text-align:center;">扫码内容：<code id="scanUrlText"></code></p>
+            <button id="scanDownload" class="btn btn-primary" style="width:100%;">下载二维码图片</button>
+          </fieldset>
+        </div>
+      </section>
+
+      <section class="panel hidden" id="panel-voice">
+        <header class="panel-head">
+          <h1>语音设置</h1>
+          <div class="panel-actions">
+            <button id="vcTest" class="btn btn-ghost">试听</button>
+            <button id="vcSave" class="btn btn-primary">保存设置</button>
+          </div>
+        </header>
+        <div class="adv-grid">
+          <fieldset>
+            <legend>播报设置</legend>
+            <label class="field">
+              <span>启用语音播报</span>
+              <input id="vcEnabled" type="checkbox" style="width:auto;">
+            </label>
+            <label class="field">
+              <span>音色</span>
+              <select id="vcVoice" style="width:220px;"></select>
+            </label>
+            <label class="field">
+              <span>语速</span>
+              <span class="range-wrap"><input id="vcSpeed" type="range" min="0.5" max="2" step="0.05"><output id="vcSpeedOut">1.00</output></span>
+            </label>
+            <label class="field">
+              <span>音量</span>
+              <span class="range-wrap"><input id="vcVolume" type="range" min="0" max="1" step="0.05"><output id="vcVolumeOut">100%</output></span>
+            </label>
+          </fieldset>
+        </div>
+        <p id="vcMsg" class="msg"></p>
+      </section>
+
+      <section class="panel hidden" id="panel-pwd">
+        <header class="panel-head">
+          <h1>修改密码</h1>
+        </header>
+        <div class="bind-form">
+          <input id="oldPwd" type="password" placeholder="原密码">
+          <input id="newPwd" type="password" placeholder="新密码（不能为空）">
+          <button id="changePwdBtn" class="btn btn-primary">修改</button>
+        </div>
+        <p id="pwdMsg" class="msg"></p>
+      </section>
+      </div>
+    </div>
+  </main>
+
+  <!-- 添加老师弹窗 -->
+  <div id="teacherModal" class="modal hidden">
+    <div class="modal-box">
+      <h3>添加老师</h3>
+      <p id="tmClass" class="muted"></p>
+      <label class="field">
+        <span>手机号</span>
+        <input id="tmPhone" type="tel" maxlength="11" placeholder="11 位手机号" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>姓名（选填）</span>
+        <input id="tmName" type="text" placeholder="老师姓名" autocomplete="off">
+      </label>
+      <div class="modal-actions">
+        <button id="tmCancel" class="btn btn-ghost">取消</button>
+        <button id="tmConfirm" class="btn btn-primary">绑定</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+let all = [];
+let teachers = [];
+let token = sessionStorage.getItem("adminToken") || "";
+
+const el = id => document.getElementById(id);
+
+// 通用消息提示：msg 元素显示文本，type 为 ok / err（留空则无附加样式）
+function setMsg(id, text, type) {
+  const m = el(id);
+  m.textContent = text;
+  m.className = "msg " + (type || "");
+}
+
+const CN_NUM = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+function cnNum(n) {
+  if (n <= 10) return CN_NUM[n];
+  if (n < 20) return "十" + CN_NUM[n - 10];
+  return String(n);
+}
+// 班级名称显示格式，与大屏端一致
+function classLabel(c, fmt) {
+  const m = String(c.class_name).match(/(\d+)年(?:级)?(\d+)班/);
+  const grade = m ? m[1] : c.grade;
+  const num = m ? m[2] : "";
+  const g = cnNum(Number(grade));
+  // fmt 可指定格式，未指定时用当前设置；预览区传入下拉框当前值，保证所见即所得
+  const useFmt = fmt || displaySettings.nameFmt;
+  if (useFmt === "cn") return `${g}（${num}）`;
+  return `${g}年${num}班`;
+}
+
+function setToken(t) {
+  token = t;
+  if (t) sessionStorage.setItem("adminToken", t);
+  else sessionStorage.removeItem("adminToken");
+}
+
+async function api(path, body) {
+  const opt = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(Object.assign({ token }, body || {})),
+  };
+  const r = await fetch(path, opt);
+  return r.json();
+}
+
+function showMain() {
+  el("login").classList.add("hidden");
+  el("main").classList.remove("hidden");
+  load();
+  loadTeachers();
+  fillGradeSelect();
+  renderClassGroups();
+}
+
+async function login() {
+  const pwd = el("pwd").value;
+  const j = await api("/api/admin/login", { password: pwd });
+  if (!j.ok) {
+    el("loginMsg").textContent = j.msg || "登录失败";
+    return;
+  }
+  setToken(j.token);
+  el("loginMsg").textContent = "";
+  showMain();
+}
+
+function logout() {
+  setToken("");
+  el("main").classList.add("hidden");
+  el("login").classList.remove("hidden");
+  el("pwd").value = "";
+}
+
+async function load() {
+  const [r, dr] = await Promise.all([
+    fetch("/api/classes"),
+    fetch("/api/display")
+  ]);
+  const j = await r.json();
+  if (j.ok) {
+    all = j.data;
+    const dj = await dr.json();
+    if (dj.ok) {
+      displaySettings = Object.assign({ width: 1920, height: 1080, cols: 6, order: [], nameFmt: "cn" }, dj.data);
+      applyStatusLabels(displaySettings.statusLabels);
+    }
+    render();
+    renderClassGroups();
+    fillGradeSelect();
+  }
+}
+
+async function loadTeachers() {
+  const r = await fetch("/api/admin/teachers?token=" + encodeURIComponent(token));
+  const j = await r.json();
+  if (!j.ok && j.msg === "登录已失效") { logout(); return; }
+  teachers = j.ok ? j.data : [];
+  renderClassGroups();
+}
+
+function fillGradeSelect() {
+  const grades = [...new Set(all.map(c => c.grade).filter(g => g > 0))].sort((a, b) => a - b);
+  if (grades.length === 0) {
+    for (let g = 1; g <= 6; g++) grades.push(g);
+  }
+  // 默认选中当前已有班级里最小的年级
+  const cur = el("nGrade").value;
+  el("nGrade").innerHTML = grades.map(g => `<option value="${g}">${g}年</option>`).join("");
+  if (cur && grades.includes(Number(cur))) el("nGrade").value = cur;
+  updatePreview();
+}
+
+function updatePreview() {
+  const grade = el("nGrade").value;
+  const num = el("nNum").value.trim();
+  if (!grade || !num) { el("nPreview").textContent = "—"; return; }
+  const gid = `${grade}${String(num).padStart(2, "0")}`;
+  el("nPreview").textContent = `${gid} · ${grade}年${num}班`;
+}
+
+const expandedClasses = new Set();
+
+function renderClassGroups() {
+  const wrap = el("classGroups");
+  const groups = {};
+  all.forEach(c => { (groups[c.grade] = groups[c.grade] || []).push(c); });
+  const grades = Object.keys(groups).map(Number).sort((a, b) => a - b);
+
+  if (grades.length === 0) {
+    wrap.innerHTML = `<p class="muted">暂无班级</p>`;
+    return;
+  }
+
+  wrap.innerHTML = grades.map(g => {
+    const list = groups[g];
+    const items = list.map(c => {
+      const tchs = teachers.filter(t => t.class_id === c.class_id);
+      const tchRows = tchs.map(t => `
+        <div class="tch-row">
+          <span class="tch-phone">${t.phone}</span>
+          <span class="tch-name">${t.name || "—"}</span>
+          <button class="btn btn-mini danger" data-unbind="${t.phone}">解绑</button>
+        </div>`).join("");
+      const open = expandedClasses.has(c.class_id);
+      return `
+      <div class="class-item ${open ? "expanded" : ""}">
+        <div class="ci-head" data-toggle="${c.class_id}">
+          <span class="ci-id">${c.class_id}</span>
+          <span class="ci-name">${c.class_name}</span>
+          <span class="ci-count">${tchs.length} 位教师</span>
+          <span class="ci-arrow">${open ? "▴" : "▾"}</span>
+        </div>
+        <div class="ci-body ${open ? "open" : ""}">
+          <button class="btn btn-mini btn-primary tch-add-btn" data-cid="${c.class_id}">+ 添加老师</button>
+          <div class="tch-list">${tchRows || `<p class="muted">暂未绑定教师</p>`}</div>
+          <button class="btn btn-mini danger ci-del" data-cid="${c.class_id}">删除班级</button>
+        </div>
+      </div>`;
+    }).join("");
+    return `
+      <div class="grade-group">
+        <div class="grade-group-head">${g}年级 <span class="muted">${list.length} 个班</span></div>
+        <div class="class-list">${items}</div>
+      </div>`;
+  }).join("");
+
+  // 展开 / 收起
+  wrap.querySelectorAll("[data-toggle]").forEach(head => {
+    head.addEventListener("click", () => {
+      const cid = head.dataset.toggle;
+      if (expandedClasses.has(cid)) expandedClasses.delete(cid);
+      else expandedClasses.add(cid);
+      renderClassGroups();
+    });
+  });
+
+  // 添加老师：打开弹窗录入，避免被自动刷新打断
+  wrap.querySelectorAll(".tch-add-btn").forEach(btn => {
+    btn.addEventListener("click", () => openTeacherModal(btn.dataset.cid));
+  });
+
+  // 解绑教师
+  wrap.querySelectorAll("[data-unbind]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const j = await api("/api/admin/unbind", { phone: btn.dataset.unbind });
+      if (j.ok) { loadTeachers(); renderClassGroups(); }
+      else alert(j.msg || "解绑失败");
+    });
+  });
+
+  // 删除班级
+  wrap.querySelectorAll(".ci-del").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const cid = btn.dataset.cid;
+      const c = all.find(x => x.class_id === cid);
+      if (!c) return;
+      if (!confirm(`确定删除 ${c.class_name}？\n将同时解绑该班所有老师。`)) return;
+      const j = await api("/api/admin/class/del", { class_id: cid });
+      if (j.ok) {
+        expandedClasses.delete(cid);
+        load();
+        loadTeachers();
+        renderClassGroups();
+        fillGradeSelect();
+      } else {
+        alert(j.msg || "删除失败");
+      }
+    });
+  });
+}
+
+// 状态名称统一来自「大屏显示设置」中的状态1/2/3名称，界面文本一律不硬编码
+let STATUS_LABEL = { 0: "上课", 1: "出教室", 2: "抵达校门" };
+
+function statusName(i) {
+  const k = i === 0 || i === 1 || i === 2 ? i : 0;
+  const n = STATUS_LABEL[k];
+  return (n && String(n).trim()) ? String(n).trim() : "状态" + (k + 1);
+}
+
+function applyStatusLabels(labels) {
+  if (Array.isArray(labels) && labels.length >= 3) {
+    STATUS_LABEL = {
+      0: (labels[0] || "").toString().trim(),
+      1: (labels[1] || "").toString().trim(),
+      2: (labels[2] || "").toString().trim(),
+    };
+  }
+  syncStatusNameTexts();
+}
+
+// 所有依赖状态名称的界面文本，统一在此同步
+function syncStatusNameTexts() {
+  const names = [statusName(0), statusName(1), statusName(2)];
+
+  // 状态总览：三态页签与循环切换提示
+  el("tabBar").querySelectorAll(".tab").forEach(tab => {
+    const n = tab.querySelector(".tab-name");
+    if (n) n.textContent = names[Number(tab.dataset.status)];
+  });
+  const ovHint = el("ovCycleHint");
+  if (ovHint) ovHint.textContent =
+    `点击任意班级卡片即可直接切换到下一个状态（${names[0]}→${names[1]}→${names[2]}→${names[0]}）。`;
+
+  // 状态颜色：字段标签
+  const putLbl = (id, text) => { const e = el(id); if (e) e.textContent = text; };
+  putLbl("lblS0Bg", `${names[0]}底色`);
+  putLbl("lblS0Text", `${names[0]}文字色`);
+  putLbl("lblS1Bg", `${names[1]}底色`);
+  putLbl("lblS1Text", `${names[1]}文字色`);
+  putLbl("lblS1Marquee", `${names[1]}跑马色`);
+  putLbl("lblS2Bg", `${names[2]}底色`);
+  putLbl("lblS2Text", `${names[2]}文字色`);
+
+  // 渐变效果：状态页签与当前编辑状态
+  el("gdTabs").querySelectorAll(".gd-tab").forEach(tab => {
+    const n = tab.querySelector(".gd-tab-name");
+    if (n) n.textContent = names[Number(tab.dataset.status)];
+  });
+  const gdCur = el("gdCurLabel");
+  if (gdCur) gdCur.textContent = names[gdCurStatus];
+}
+let currentStatus = 0;
+
+function overviewCountdown(c) {
+  if (!(c.status === 1 || c.status === 2) || !c.update_time) return "";
+  const t0 = new Date(String(c.update_time).replace(" ", "T")).getTime();
+  if (!Number.isFinite(t0)) return "";
+  const sec = Math.max(0, Math.floor((Date.now() - t0) / 1000));
+  return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+}
+
+function render() {
+  const s = [0, 0, 0];
+  all.forEach(c => s[c.status]++);
+  el("cnt0").textContent = s[0];
+  el("cnt1").textContent = s[1];
+  el("cnt2").textContent = s[2];
+
+  // 按与大屏同步的拖动排序 order 排列总览班级；无 order 时默认按班级编号升序
+  const ordered = all.slice().sort((a, b) => {
+    if (displaySettings.order.length) {
+      const ia = displaySettings.order.indexOf(a.class_id);
+      const ib = displaySettings.order.indexOf(b.class_id);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    }
+    // 默认按班级编号数字升序
+    return Number(a.class_id) - Number(b.class_id);
+  });
+
+  // 当前 tab 只显示该状态的班级
+  const list = ordered.filter(c => c.status === currentStatus);
+
+  // 总览卡片列数与大屏每行班级数同步
+  el("rows").style.setProperty("--ov-cols", displaySettings.cols);
+
+  el("rows").innerHTML = list.map(c => {
+    const st = "s" + c.status;
+    return `
+      <div class="card ${st} ov-card" data-id="${c.class_id}">
+        <div class="card-name">${classLabel(c)}</div>
+        <div class="card-status">${statusName(c.status)}</div>
+        <div class="card-time">${overviewCountdown(c)}</div>
+      </div>`;
+  }).join("");
+
+  if (list.length === 0) {
+    el("rows").innerHTML = `<p class="muted" style="grid-column:1/-1">当前状态下暂无班级</p>`;
+  }
+
+  el("rows").querySelectorAll(".ov-card").forEach(card => {
+    card.addEventListener("click", () => cycleStatus(card.dataset.id));
+  });
+}
+
+setInterval(() => {
+  document.querySelectorAll("#rows .ov-card[data-id]").forEach(card => {
+    const c = all.find(x => x.class_id === card.dataset.id);
+    if (!c) return;
+    const node = card.querySelector(".card-time");
+    if (node) node.textContent = overviewCountdown(c);
+  });
+}, 1000);
+
+// 点击班级卡片：自动循环切换到下一个状态
+async function cycleStatus(cid) {
+  const c = all.find(x => x.class_id === cid);
+  if (!c) return;
+  const next = (c.status + 1) % 3;
+  const j = await api("/api/admin/status", { class_id: cid, status: next, reason: "" });
+  if (j.ok) {
+    load();
+  } else {
+    alert(j.msg || "切换失败");
+  }
+}
+
+// ---------- 添加老师弹窗 ----------
+function openTeacherModal(cid) {
+  const c = all.find(x => x.class_id === cid);
+  if (!c) return;
+  el("tmClass").textContent = `班级：${c.class_name}`;
+  el("tmPhone").value = "";
+  el("tmName").value = "";
+  el("teacherModal").dataset.cid = cid;
+  el("teacherModal").classList.remove("hidden");
+  setTimeout(() => el("tmPhone").focus(), 50);
+}
+
+el("tmCancel").addEventListener("click", () => el("teacherModal").classList.add("hidden"));
+
+el("tmConfirm").addEventListener("click", async () => {
+  const cid = el("teacherModal").dataset.cid;
+  const phone = el("tmPhone").value.trim();
+  const name = el("tmName").value.trim();
+  if (!phone) { alert("请填写教师手机号"); return; }
+  const j = await api("/api/admin/bind", { phone, class_id: cid, name });
+  if (j.ok) {
+    el("teacherModal").classList.add("hidden");
+    expandedClasses.add(cid);
+    loadTeachers();
+    renderClassGroups();
+  } else {
+    alert(j.msg || "绑定失败");
+  }
+});
+
+el("addClassBtn").addEventListener("click", async () => {
+  const grade = el("nGrade").value;
+  const num = el("nNum").value.trim();
+  if (!grade || !num) { alert("请选择年级并填写班级号"); return; }
+  const cid = `${grade}${String(num).padStart(2, "0")}`;
+  const name = `${grade}年${num}班`;
+  if (all.some(c => c.class_id === cid)) { alert(`编号 ${cid} 已存在，请更换班级号`); return; }
+  const j = await api("/api/admin/class/add", { class_id: cid, class_name: name, grade });
+  if (j.ok) {
+    el("nNum").value = "";
+    load();
+  } else {
+    alert(j.msg || "添加失败");
+  }
+});
+
+el("nGrade").addEventListener("change", updatePreview);
+el("nNum").addEventListener("input", updatePreview);
+
+el("changePwdBtn").addEventListener("click", async () => {
+  const oldPwd = el("oldPwd").value;
+  const newPwd = el("newPwd").value;
+  if (!oldPwd || !newPwd) { el("pwdMsg").textContent = "请填写原密码和新密码"; return; }
+  const j = await api("/api/admin/password", { old_password: oldPwd, new_password: newPwd });
+  if (j.ok) {
+    el("pwdMsg").textContent = "密码已修改，请重新登录";
+    el("oldPwd").value = "";
+    el("newPwd").value = "";
+    setTimeout(logout, 1200);
+  } else {
+    el("pwdMsg").textContent = j.msg || "修改失败";
+  }
+});
+
+// ---------- 大屏显示设置弹窗 ----------
+let displaySettings = { width: 1920, height: 1080, cols: 6, order: [], nameFmt: "cn", cardW: 0, cardH: 0, advanced: {} };
+let dsDragIndex = null;
+
+// 三态颜色同步到根元素，供总览卡片（不在预览画布内）使用
+function applyGlobalStateColors() {
+  const a = displaySettings.advanced || {};
+  const root = document.documentElement.style;
+  const set = (key, value) => {
+    if (value) root.setProperty(key, value);
+    else root.removeProperty(key);
+  };
+  set("--s0-bg", a.s0Bg);
+  set("--s0-text", a.s0Text);
+  set("--s1-bg", a.s1Bg);
+  set("--s1-text", a.s1Text);
+  set("--s1-marquee", a.s1Marquee);
+  set("--s2-bg", a.s2Bg);
+  set("--s2-text", a.s2Text);
+}
+
+// ===== 渐变效果：把配置转换为 CSS 变量（与大屏端 index.html 一致） =====
+function gdHexRgb(hex) {
+  const h = String(hex || "#ffffff").replace("#", "");
+  if (h.length !== 6) return [255, 255, 255];
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+// 生成某个状态的渐变 CSS 变量，prefix 形如 "--gd0"
+function gradientVarsFor(g, set, prefix) {
+  g = g || {};
+  const on = g.enabled !== false;
+  set(prefix + "-enabled", on ? "1" : "0");
+  if (!on) { set(prefix + "-img", ""); set(prefix + "-anim", "none"); return; }
+  const alpha = (g.opacity === undefined ? 100 : Number(g.opacity)) / 100;
+  const [r1,gg1,b1] = gdHexRgb(g.start || "#ffffff");
+  const [r2,gg2,b2] = gdHexRgb(g.end || "#fbbf24");
+  const S = `rgba(${r1},${gg1},${b1},${alpha})`, E = `rgba(${r2},${gg2},${b2},${alpha})`;
+  const mid = Math.max(0, Math.min(100, Number(g.midpoint === undefined ? 50 : g.midpoint)));
+  const mid2 = Math.min(100, mid + Math.max(8, (100 - mid) / 2));
+  const dir = g.direction || "ltr";
+  const horizontal = dir === "ltr" || dir === "rtl";
+  const rev = dir === "rtl" || dir === "btt";
+  let img;
+  if (g.kind === "radial") {
+    img = `radial-gradient(circle, ${S} 0%, ${S} ${mid}%, ${E} ${mid2}%, ${E} 100%)`;
+  } else {
+    const ang = { ltr:"90deg", rtl:"270deg", ttb:"180deg", btt:"0deg" }[dir];
+    img = `linear-gradient(${ang}, ${S} 0%, ${S} ${mid}%, ${E} ${mid2}%, ${E} 100%)`;
+  }
+  set(prefix + "-img", img);
+  const spread = Math.max(100, Math.min(500, Number(g.spread === undefined ? 200 : g.spread))) / 100;
+  set(prefix + "-size", g.kind === "radial" ? `${spread*100}% ${spread*100}%`
+    : (horizontal ? `${spread*100}% 100%` : `100% ${spread*100}%`));
+  if (g.mode === "static") set(prefix + "-anim", "none");
+  else {
+    const anim = (g.kind === "radial") ? (rev ? "gd-x-rev" : "gd-x")
+      : (horizontal ? (rev ? "gd-x-rev" : "gd-x") : (rev ? "gd-y-rev" : "gd-y"));
+    set(prefix + "-anim", anim);
+  }
+  set(prefix + "-dur", `${Number(g.period === undefined ? 1.5 : g.period)}s`);
+  set(prefix + "-iter", g.loop === "loop" ? "infinite" : "infinite alternate");
+}
+// 三个状态分别下发变量
+function gradientVars(g, set) {
+  normalizeGradients(g).forEach((cfg, i) => gradientVarsFor(cfg, set, `--gd${i}`));
+}
+
+// 把高级配置下发为 CSS 变量，与大屏端 applyAdvancedVars 保持一致
+function applyAdvancedVars(target) {
+  const a = displaySettings.advanced || {};
+  const set = (key, value) => {
+    if (value === undefined || value === null || value === "") target.style.removeProperty(key);
+    else target.style.setProperty(key, String(value));
+  };
+  gradientVars(a.gradient, set);
+  const layout = Number(a.layout || 2);
+  const oneRow = layout === 1;
+  set("--card-dir", oneRow ? "row" : "column");
+  set("--meta-dir", layout <= 2 ? "row" : "column");
+  // 一排模式：三项文字同排，自动压缩字号并放宽下限，避免溢出
+  const f = oneRow ? 0.5 : 1;
+  set("--name-min", oneRow ? "8px" : "");
+  set("--status-min", oneRow ? "8px" : "");
+  set("--time-min", oneRow ? "8px" : "");
+  set("--card-radius", a.radius !== undefined ? a.radius + "px" : "");
+  set("--card-padding", a.padding);
+  set("--card-gap", a.gap);
+  set("--card-border-alpha", a.borderAlpha);
+  set("--name-scale", Number(a.nameScale || 60) * f);
+  set("--status-scale", Number(a.statusScale || 28) * f);
+  set("--time-scale", Number(a.timeScale || 28) * f);
+  set("--name-weight", a.nameWeight);
+  set("--status-weight", a.statusWeight);
+  set("--time-weight", a.timeWeight);
+  set("--card-font", a.fontFamily);
+  // 三态颜色：底色、文字色，以及状态2跑马色
+  set("--s0-bg", a.s0Bg);
+  set("--s0-text", a.s0Text);
+  set("--s1-bg", a.s1Bg);
+  set("--s1-text", a.s1Text);
+  set("--s1-marquee", a.s1Marquee);
+  set("--s2-bg", a.s2Bg);
+  set("--s2-text", a.s2Text);
+  // 总览卡片不在预览画布内，同步到根元素供其使用
+  applyGlobalStateColors();
+}
+
+// 加载大屏显示设置到表单并渲染预览（进入该 tab 时调用）
+async function loadDisplaySettings() {
+  const r = await fetch("/api/display");
+  const j = await r.json();
+  if (j.ok) {
+    displaySettings = Object.assign({ width: 1920, height: 1080, cols: 6, order: [], nameFmt: "cn", cardW: 0, cardH: 0, advanced: {} }, j.data);
+    applyStatusLabels(displaySettings.statusLabels);
+    const labs = displaySettings.statusLabels || ["上课", "出教室", "抵达校门"];
+    el("dsLabel0").value = labs[0] || "";
+    el("dsLabel1").value = labs[1] || "";
+    el("dsLabel2").value = labs[2] || "";
+  }
+  el("dsCols").value = displaySettings.cols;
+  el("dsCardW").value = displaySettings.cardW;
+  el("dsCardH").value = displaySettings.cardH;
+  el("dsNameFmt").value = displaySettings.nameFmt;
+  applyGlobalStateColors();
+  renderDisplayPreview();
+}
+
+// 拖动排序预览：按设置分辨率等比缩放的网格画布，所见即所得
+function renderDisplayPreview() {
+  const wrap = el("dsPreview");
+  const w = displaySettings.width;
+  const h = displaySettings.height;
+  const cols = displaySettings.cols;
+
+  // 排版序列：order 中的空字符串表示空占位卡片；无 order 时按班级编号升序展开
+  const order = displaySettings.order.length
+    ? displaySettings.order.slice()
+    : all.slice().sort((a, b) => Number(a.class_id) - Number(b.class_id)).map(c => c.class_id);
+  // 与大屏一致：用空卡片补齐最后一行
+  while (order.length % cols !== 0) order.push("");
+
+  const cards = order.map((cid, i) => {
+    const c = cid === "" ? null : all.find(x => x.class_id === cid);
+    if (!c) {
+      // 空占位卡片：可拖拽排版，点击可删除
+      return `
+        <div class="card empty" draggable="true" data-idx="${i}" data-cid="" title="空位：点击删除">
+          <span class="ds-idx">${i + 1}</span>
+          <span class="ds-drag" title="拖动排序">⠿</span>
+        </div>`;
+    }
+    // 倒计时：与大屏一致，状态1/2 显示「分:秒」，状态0 无倒计时
+    const counting = c.status === 1 || c.status === 2;
+    let countdown = "";
+    if (counting && c.update_time) {
+      const t0 = new Date(String(c.update_time).replace(" ", "T")).getTime();
+      if (!isNaN(t0)) {
+        const sec = Math.max(0, Math.floor((Date.now() - t0) / 1000));
+        countdown = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+      }
+    }
+    const label = statusName(c.status);
+    const adv = displaySettings.advanced || {};
+    const layout = adv.layout || 2;
+    // 渐变按状态分别配置：取该卡片状态对应的配置
+    const gd = normalizeGradients(adv.gradient)[Math.max(0, Math.min(2, c.status))] || {};
+    const targets = (gd.enabled !== false && Array.isArray(gd.targets)) ? gd.targets : [];
+    const cls = "s" + c.status + ` layout-${layout}`
+      + (targets.includes("bg") ? " gd-bg" : "");
+    const nameHtml = `<div class="card-name${targets.includes("name") ? " gd-elem" : ""}">${classLabel(c, el("dsNameFmt").value)}</div>`;
+    const statusHtml = `<div class="card-status${targets.includes("text") ? " gd-elem" : ""}">${label}</div>`;
+    const timeHtml = `<div class="card-time${targets.includes("time") ? " gd-elem" : ""}">${countdown}</div>`;
+    // 与大屏端一致的三档排版
+    let content;
+    if (layout === 1) {
+      content = `<div class="card-meta">${nameHtml}${statusHtml}${timeHtml}</div>`;
+    } else if (layout === 2) {
+      content = `${nameHtml}<div class="card-meta meta-row">${statusHtml}${timeHtml}</div>`;
+    } else {
+      // 三排：班级名独立，状态与时间竖排于 meta（保持共享渐变动画）
+      content = `${nameHtml}<div class="card-meta meta-col">${statusHtml}${timeHtml}</div>`;
+    }
+    return `
+      <div class="card ${cls}" draggable="true" data-idx="${i}" data-cid="${cid}">
+        ${content}
+        <span class="ds-idx">${i + 1}</span>
+        <span class="ds-drag" title="拖动排序">⠿</span>
+      </div>`;
+  }).join("");
+
+  // 班级块网格：与大屏端 .cards 同名同构，仅变量名不同
+  const grid = document.createElement("div");
+  grid.className = "cards";
+  grid.style.setProperty("--cols", cols);
+  // 班级块尺寸：设了 cardW/cardH 则固定，否则移除变量由 CSS 自动计算（列均分宽度、内容撑高度）
+  // 注意：不能设为空字符串，否则 var() 不会回退，导致 minmax 无效
+  if (displaySettings.cardW) grid.style.setProperty("--card-w", displaySettings.cardW + "px");
+  else grid.style.removeProperty("--card-w");
+  if (displaySettings.cardH) grid.style.setProperty("--card-h", displaySettings.cardH + "px");
+  else grid.style.removeProperty("--card-h");
+  grid.innerHTML = cards || `<p class="muted" style="grid-column:1/-1">暂无班级</p>`;
+
+  // 舞台画布：与大屏端 .screen-stage 同名同构，整体等比缩放
+  const canvas = document.createElement("div");
+  canvas.className = "screen-stage";
+  canvas.style.setProperty("--sw", w + "px");
+  canvas.style.setProperty("--sh", h + "px");
+  applyAdvancedVars(canvas);
+  canvas.appendChild(grid);
+
+  // 预览按固定画布比例（w×h）等比缩放，与大屏端一致：
+  // 大屏按物理分辨率均分行列铺满；预览用相同宽高比缩放到容器内。
+  const holder = document.createElement("div");
+  holder.style.overflow = "hidden";
+  holder.appendChild(canvas);
+  wrap.innerHTML = "";
+  wrap.appendChild(holder);
+
+  const availW = Math.max(wrap.clientWidth, 120);
+  const availH = Math.max(wrap.clientHeight, 120);
+  const scale = Math.min(availW / w, availH / h, 1);
+  canvas.style.transform = `scale(${scale})`;
+  holder.style.width = Math.round(w * scale) + "px";
+  holder.style.height = Math.round(h * scale) + "px";
+
+  const cards2 = wrap.querySelectorAll(".card");
+  cards2.forEach(card => {
+    card.addEventListener("dragstart", e => {
+      dsDragIndex = Number(card.dataset.idx);
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    card.addEventListener("dragend", () => {
+      card.classList.remove("dragging");
+      dsDragIndex = null;
+      wrap.querySelectorAll(".card").forEach(c => c.classList.remove("drag-over"));
+    });
+    card.addEventListener("dragover", e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      wrap.querySelectorAll(".card").forEach(c => c.classList.remove("drag-over"));
+      card.classList.add("drag-over");
+    });
+    card.addEventListener("drop", e => {
+      e.preventDefault();
+      const from = dsDragIndex;
+      const to = Number(card.dataset.idx);
+      if (from === null || from === to) return;
+      // 用当前排版序列（含空占位）做插入，实现任意位置排版
+      const arr = order.slice();
+      const [moved] = arr.splice(from, 1);
+      arr.splice(to, 0, moved);
+      displaySettings.order = arr;
+      renderDisplayPreview();
+    });
+    // 点击空占位卡片：删除该空位
+    if (card.dataset.cid === "") {
+      card.addEventListener("click", () => {
+        const arr = order.slice();
+        arr.splice(Number(card.dataset.idx), 1);
+        displaySettings.order = arr;
+        renderDisplayPreview();
+      });
+    }
+  });
+
+  // 文字自适应填充：按实际渲染宽度微调字号，使名称恰好占满班级块
+  fitCardNames(grid);
+}
+
+// 让班级名文字恰好填满班级块：按实际渲染宽度微调字号，避免折行或被裁切
+function fitCardNames(root) {
+  root.querySelectorAll(".card").forEach(card => {
+    const nameEl = card.querySelector(".card-name");
+    if (!nameEl) return;
+    nameEl.style.fontSize = ""; // 回到 CSS 基准字号（cqw 比例）
+    const cs = getComputedStyle(card);
+    // 一排模式下名称与状态/时间同排，需扣除同行元素占位与间距
+    const meta = card.querySelector(".card-meta");
+    // 一排模式下班级名已在 meta 容器内，跳过自适应放大，由配置字号控制
+    if (meta && nameEl.parentElement === meta) return;
+    const reserved = cs.flexDirection === "row" && meta
+      ? meta.scrollWidth + (parseFloat(cs.columnGap) || 0) : 0;
+    const avail = card.clientWidth
+      - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth)
+      - reserved;
+    if (avail <= 0) return;
+    const textW = nameEl.scrollWidth;
+    if (textW <= 0 || textW <= avail) return;
+    const cur = parseFloat(getComputedStyle(nameEl).fontSize);
+    if (!cur) return;
+    // 第一轮：按比例缩小到恰好填满可用宽度
+    nameEl.style.fontSize = (cur * avail / textW) + "px";
+    // 第二轮：scrollWidth 取整可能仍差 1px，再收一次确保不溢出
+    const w2 = nameEl.scrollWidth;
+    if (w2 > avail) {
+      const fs2 = parseFloat(getComputedStyle(nameEl).fontSize);
+      nameEl.style.fontSize = (fs2 * avail / w2) + "px";
+    }
+  });
+}
+
+// 添加空占位卡片：追加到排版末尾，管理员可再拖到任意位置
+el("dsAddBlank").addEventListener("click", () => {
+  const arr = displaySettings.order.length
+    ? displaySettings.order.slice()
+    : all.slice().sort((a, b) => Number(a.class_id) - Number(b.class_id)).map(c => c.class_id);
+  arr.push("");
+  displaySettings.order = arr;
+  renderDisplayPreview();
+});
+
+// 班级名格式变化时重渲染预览，保持与大屏显示一致
+el("dsNameFmt").addEventListener("change", () => {
+  displaySettings.nameFmt = el("dsNameFmt").value;
+  renderDisplayPreview();
+});
+
+// 列数/班级块尺寸变化时实时重渲染预览，拖动区随设置实时变动
+["dsCols", "dsCardW", "dsCardH"].forEach(id => {
+  el(id).addEventListener("input", () => {
+    const v = el(id).value.trim();
+    if (v === "") {
+      // 清空时回到自动（0）
+      if (id === "dsCardW") displaySettings.cardW = 0;
+      else if (id === "dsCardH") displaySettings.cardH = 0;
+      else return;
+    } else {
+      const n = Number(v);
+      if (Number.isNaN(n)) return;
+      if (id === "dsCols") displaySettings.cols = n;
+      else if (id === "dsCardW") displaySettings.cardW = n;
+      else if (id === "dsCardH") displaySettings.cardH = n;
+    }
+    renderDisplayPreview();
+  });
+});
+
+el("dsConfirm").addEventListener("click", async () => {
+  const payload = {
+    display: {
+      width: displaySettings.width,
+      height: displaySettings.height,
+      cols: Number(el("dsCols").value) || displaySettings.cols,
+      cardW: Number(el("dsCardW").value) || 0,
+      cardH: Number(el("dsCardH").value) || 0,
+      nameFmt: el("dsNameFmt").value,
+      order: displaySettings.order,
+    },
+  };
+  const j = await api("/api/admin/display", payload);
+  if (!j.ok) { alert(j.msg || "保存失败"); return; }
+  displaySettings = Object.assign(displaySettings, j.data);
+  // 保存状态名称
+  const labels = [el("dsLabel0").value.trim(), el("dsLabel1").value.trim(), el("dsLabel2").value.trim()];
+  const lj = await api("/api/admin/status-labels", { labels });
+  if (lj.ok) {
+    applyStatusLabels(lj.data);
+    displaySettings.statusLabels = lj.data;
+  }
+  // 每行班级数与班级名格式影响总览卡片，重渲染总览同步显示
+  render();
+  renderDisplayPreview();
+  alert("大屏显示设置已保存");
+});
+
+el("loginBtn").addEventListener("click", login);
+el("pwd").addEventListener("keydown", e => { if (e.key === "Enter") login(); });
+el("refresh").addEventListener("click", () => { load(); loadTeachers(); renderClassGroups(); fillGradeSelect(); });
+el("logout").addEventListener("click", logout);
+
+// 模块 tab 分页切换：状态总览 / 班级管理 / 大屏显示设置 / 高级设置 / 定时任务 / 修改密码
+const MODULE_PANELS = {
+  overview: "panel-overview",
+  classes: "panel-classes",
+  display: "panel-display",
+  style: "panel-style",
+  schedule: "panel-schedule",
+  scan: "panel-scan",
+  voice: "panel-voice",
+  pwd: "panel-pwd",
+};
+el("moduleBar").querySelectorAll(".module-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    const mod = tab.dataset.module;
+    el("moduleBar").querySelectorAll(".module-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    Object.entries(MODULE_PANELS).forEach(([k, panelId]) => {
+      el(panelId).classList.toggle("hidden", k !== mod);
+    });
+    // 进入对应 tab 时加载其数据
+    if (mod === "display") loadDisplaySettings();
+    if (mod === "style") loadAdvanced();
+    if (mod === "schedule") loadSchedule();
+    if (mod === "scan") loadScan();
+    if (mod === "voice") loadVoice();
+  });
+});
+
+// ---------- 扫码放学 ----------
+async function loadScan() {
+  try {
+    const r = await fetch("/api/scan/info");
+    const j = await r.json();
+    if (!j.ok) return;
+    const server = j.data.scanServer || "";
+    el("scanServer").value = server;
+    renderScanQr();
+  } catch (e) {}
+}
+
+// ---------- 语音播报设置 ----------
+async function loadVoice() {
+  try {
+    const r = await fetch("/api/voice");
+    const j = await r.json();
+    if (!j.ok) return;
+    const s = j.data.settings || {};
+    const voices = j.data.voices || [];
+    const sel = el("vcVoice");
+    const prev = s.voice || "";
+    const options = voices.length
+      ? voices.map(v => `<option value="${v}">${v}</option>`).join("")
+      : `<option value="">（暂无音色）</option>`;
+    sel.innerHTML = options;
+    sel.value = voices.includes(prev) ? prev : (voices[0] || "");
+    el("vcEnabled").checked = !!s.enabled;
+    const speed = Number(s.speed) || 1;
+    const volume = Number(s.volume);
+    const vol = Number.isFinite(volume) ? volume : 1;
+    el("vcSpeed").value = speed;
+    el("vcVolume").value = vol;
+    el("vcSpeedOut").textContent = Number(speed).toFixed(2);
+    el("vcVolumeOut").textContent = Math.round(vol * 100) + "%";
+  } catch (e) { el("vcMsg").textContent = "加载语音设置失败"; }
+}
+
+el("vcSpeed").addEventListener("input", e => { el("vcSpeedOut").textContent = Number(e.target.value).toFixed(2); });
+el("vcVolume").addEventListener("input", e => { el("vcVolumeOut").textContent = Math.round(Number(e.target.value) * 100) + "%"; });
+
+function collectVoiceSettings() {
+  return {
+    enabled: !!el("vcEnabled").checked,
+    voice: el("vcVoice").value || "",
+    speed: Number(el("vcSpeed").value),
+    volume: Number(el("vcVolume").value)
+  };
+}
+
+el("vcSave").addEventListener("click", async () => {
+  const settings = collectVoiceSettings();
+  if (settings.enabled && !settings.voice) {
+    el("vcMsg").textContent = "启用播报前请选择音色";
+    return;
+  }
+  const j = await api("/api/admin/voice", { settings });
+  el("vcMsg").textContent = j.ok ? "语音设置已保存" : (j.msg || "保存失败");
+});
+
+el("vcTest").addEventListener("click", async () => {
+  const j = await api("/api/admin/voice/test", { text: "放学播报测试，请同学们有序离校" });
+  el("vcMsg").textContent = j.ok ? "已加入播报队列" : (j.msg || "试听失败");
+});
+
+async function renderScanQr() {
+  const server = el("scanServer").value.trim();
+  const img = el("scanQrImg");
+  const hint = el("scanQrHint");
+  const urlText = el("scanUrlText");
+  try {
+    // 后端按当前配置的服务器地址生成二维码
+    const r = await fetch("/api/scan/qr");
+    if (!r.ok) { hint.textContent = "二维码生成失败"; return; }
+    const svg = await r.text();
+    if (!svg) { hint.textContent = "二维码生成失败"; return; }
+    // 使用后端返回的实际扫码地址（绑定 IP + 端口）
+    const scanUrl = r.headers.get("X-Scan-Url") || (server ? server.replace(/\/+$/, "") + "/scan" : window.location.origin + "/scan");
+    urlText.textContent = scanUrl;
+    // SVG 转图片预览
+    const blob = new Blob([svg], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    img.src = url;
+    img.style.display = "block";
+    hint.classList.add("hidden");
+    // 下载时也用该 SVG
+    img.dataset.svg = svg;
+  } catch (e) {
+    hint.textContent = "网络不稳定，请重试";
+  }
+}
+
+el("scanRefresh").addEventListener("click", renderScanQr);
+el("scanServer").addEventListener("change", renderScanQr);
+el("scanServerSave").addEventListener("click", async () => {
+  const server = el("scanServer").value.trim();
+  const msg = el("scanServerMsg");
+  try {
+    const r = await fetch("/api/admin/scan-server", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: token, scanServer: server }),
+    });
+    const j = await r.json();
+    if (j.ok) {
+      msg.textContent = "已保存";
+      renderScanQr();
+    } else {
+      msg.textContent = j.msg || "保存失败";
+    }
+  } catch (e) {
+    msg.textContent = "网络不稳定，请重试";
+  }
+});
+el("scanDownload").addEventListener("click", () => {
+  const svg = el("scanQrImg").dataset.svg;
+  if (!svg) return;
+  const urlText = el("scanUrlText").textContent;
+  const blob = new Blob([svg], { type: "image/svg+xml" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "放学扫码二维码.svg";
+  a.click();
+});
+
+// ---------- 大屏高级设置：表单化配置 ----------
+let advOriginal = null; // 加载时的配置快照，用于「放弃修改」
+
+// 文字大小：滑块与填写框双向同步
+const SCALE_IDS = ["advNameScale", "advStatusScale", "advTimeScale"];
+// 粗细：滑块旁只显示数值
+const WEIGHT_IDS = ["advNameWeight", "advStatusWeight", "advTimeWeight"];
+
+// 渐变滑块：拖动时实时更新数值显示
+const GD_SLIDERS = [
+  ["gdMid","gdMidOut", v => v + "%"],
+  ["gdOpacity","gdOpacityOut", v => v + "%"],
+  ["gdPeriod","gdPeriodOut", v => Number(v).toFixed(1) + "s"],
+  ["gdSpread","gdSpreadOut", v => v + "%"],
+];
+GD_SLIDERS.forEach(([id, out, fmt]) => {
+  el(id).addEventListener("input", () => { el(out).value = fmt(el(id).value); });
+});
+
+function syncSliderOutputs() {
+  SCALE_IDS.forEach(id => { el(id + "Num").value = el(id).value; });
+  WEIGHT_IDS.forEach(id => { el(id + "Out").value = el(id).value; });
+}
+
+// ---------- 渐变效果：按状态分别配置（状态名称取自状态名称设置，见 statusName） ----------
+const GD_DEFAULT = {
+  enabled: true, targets: ["text", "time"], mode: "flow", kind: "linear",
+  start: "#ffffff", end: "#fbbf24", midpoint: 50, opacity: 100,
+  direction: "ltr", loop: "pingpong", period: 1.5, spread: 200,
+};
+// 各状态差异化默认值：状态2渐变更亮，状态3默认关闭（与后端预置一致）
+const GD_STATE_DEFAULT = [
+  GD_DEFAULT,
+  Object.assign({}, GD_DEFAULT, { end: "#ffefaa" }),
+  Object.assign({}, GD_DEFAULT, { enabled: false }),
+];
+let gdCurStatus = 0;   // 当前编辑的状态索引（0/1/2 对应状态1/2/3名称）
+let gdState = null;    // 三个状态的渐变配置
+
+// 兼容旧版扁平结构：若 gradient 直接含 mode/targets，则视为三个状态共用
+function normalizeGradients(g) {
+  const one = (src, i) => Object.assign({}, GD_STATE_DEFAULT[i], src || {});
+  if (!g || typeof g !== "object") return GD_STATE_DEFAULT.map((_, i) => one(null, i));
+  if (g.mode || g.targets || g.enabled !== undefined) {
+    return [one(g, 0), one(g, 1), one(g, 2)];
+  }
+  return [one(g.s0, 0), one(g.s1, 1), one(g.s2, 2)];
+}
+
+// 把某个状态的渐变配置填入表单
+function fillGradientForm(g) {
+  el("gdEnabled").value = g.enabled === false ? "0" : "1";
+  el("gdMode").value = g.mode || "flow";
+  el("gdKind").value = g.kind || "linear";
+  const targets = Array.isArray(g.targets) ? g.targets : ["text", "time"];
+  document.querySelectorAll(".gd-target").forEach(c => { c.checked = targets.includes(c.value); });
+  el("gdStart").value = g.start || "#ffffff";
+  el("gdEnd").value = g.end || "#fbbf24";
+  el("gdMid").value = g.midpoint === undefined ? 50 : g.midpoint;
+  el("gdOpacity").value = g.opacity === undefined ? 100 : g.opacity;
+  el("gdDirection").value = g.direction || "ltr";
+  el("gdLoop").value = g.loop || "pingpong";
+  el("gdPeriod").value = g.period === undefined ? 1.5 : g.period;
+  el("gdSpread").value = g.spread === undefined ? 200 : g.spread;
+  GD_SLIDERS.forEach(([id, out, fmt]) => { el(out).value = fmt(el(id).value); });
+  el("gdCurLabel").textContent = statusName(gdCurStatus);
+}
+
+// 从表单读取当前状态的渐变配置
+function readGradientForm() {
+  const num = id => Number(el(id).value);
+  return {
+    enabled: el("gdEnabled").value === "1",
+    targets: Array.from(document.querySelectorAll(".gd-target")).filter(c => c.checked).map(c => c.value),
+    mode: el("gdMode").value,
+    kind: el("gdKind").value,
+    start: el("gdStart").value,
+    end: el("gdEnd").value,
+    midpoint: num("gdMid"),
+    opacity: num("gdOpacity"),
+    direction: el("gdDirection").value,
+    loop: el("gdLoop").value,
+    period: num("gdPeriod"),
+    spread: num("gdSpread"),
+  };
+}
+
+// 状态切换标签
+el("gdTabs").querySelectorAll(".gd-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    if (!gdState) return;
+    // 先保存当前状态未提交的修改，再切换
+    gdState[gdCurStatus] = readGradientForm();
+    gdCurStatus = Number(tab.dataset.status);
+    el("gdTabs").querySelectorAll(".gd-tab").forEach(t => t.classList.toggle("active", t === tab));
+    el("gdCurLabel").textContent = statusName(gdCurStatus);
+    fillGradientForm(gdState[gdCurStatus]);
+  });
+});
+
+// 渐变表单变化时实时刷新大屏预览（未保存也能看到效果）
+function syncGradientPreview() {
+  if (!gdState) return;
+  gdState[gdCurStatus] = readGradientForm();
+  displaySettings.advanced = displaySettings.advanced || {};
+  displaySettings.advanced.gradient = { s0: gdState[0], s1: gdState[1], s2: gdState[2] };
+  const canvas = el("dsPreview").querySelector(".screen-stage");
+  if (canvas) applyAdvancedVars(canvas);
+  renderDisplayPreview();
+}
+["gdEnabled","gdMode","gdKind","gdStart","gdEnd","gdMid","gdOpacity","gdDirection","gdLoop","gdPeriod","gdSpread"]
+  .forEach(id => {
+    const node = el(id);
+    node.addEventListener("change", syncGradientPreview);
+    node.addEventListener("input", syncGradientPreview);
+  });
+document.querySelectorAll(".gd-target").forEach(cb => {
+  cb.addEventListener("change", syncGradientPreview);
+});
+SCALE_IDS.forEach(id => {
+  const range = el(id);
+  const num = el(id + "Num");
+  // 拖动滑块 → 填写框实时跟随
+  range.addEventListener("input", () => { num.value = range.value; });
+  // 填写框失焦/回车 → 同步到滑块，并纠正越界值
+  num.addEventListener("change", () => {
+    if (num.value !== "") range.value = num.value;
+    num.value = range.value;
+  });
+});
+WEIGHT_IDS.forEach(id => {
+  el(id).addEventListener("input", () => { el(id + "Out").value = el(id).value; });
+});
+
+// 班级排序预设（与后端 default_order 保持一致）
+const DEFAULT_ORDER = "101,102,103,104,105,106,107,201,202,203,204,205,206,207,301,302,303,304,305,306,307,401,402,403,404,405,406,407,501,502,503,504,505,506,507,601,602,603,604,605,606,607";
+
+// 把配置填入表单
+function fillAdvancedForm(d) {
+  const a = d.advanced || {};
+  const put = (id, v) => { el(id).value = v === undefined || v === null ? "" : v; };
+  put("advLayout", a.layout || 2);
+  put("advRadius", a.radius);
+  put("advBorderAlpha", a.borderAlpha);
+  put("advPadding", a.padding);
+  put("advGap", a.gap);
+  put("advNameScale", a.nameScale);
+  put("advStatusScale", a.statusScale);
+  put("advTimeScale", a.timeScale);
+  put("advNameWeight", a.nameWeight);
+  put("advStatusWeight", a.statusWeight);
+  put("advTimeWeight", a.timeWeight);
+  put("advFont", a.fontFamily || "");
+  put("advS0Bg", a.s0Bg || "#000000");
+  put("advS0Text", a.s0Text || "#ffffff");
+  put("advS1Bg", a.s1Bg || "#b4b400");
+  put("advS1Text", a.s1Text || "#ffefaa");
+  put("advS1Marquee", a.s1Marquee || "#fbbf24");
+  put("advS2Bg", a.s2Bg || "#22c55e");
+  put("advS2Text", a.s2Text || "#0a3d1d");
+  // 渐变效果：按状态分别配置（兼容旧版扁平结构）
+  gdState = normalizeGradients(a.gradient);
+  fillGradientForm(gdState[gdCurStatus]);
+  put("advCols", d.cols);
+  put("advCardW", d.cardW);
+  put("advCardH", d.cardH);
+  put("advOrder", (d.order || []).join(",") || DEFAULT_ORDER);
+  syncSliderOutputs();
+}
+
+// 从表单读取配置
+function readAdvancedForm() {
+  const num = id => Number(el(id).value);
+  return {
+    layout: num("advLayout"),
+    radius: num("advRadius"),
+    borderAlpha: num("advBorderAlpha"),
+    padding: num("advPadding"),
+    gap: num("advGap"),
+    nameScale: num("advNameScale"),
+    statusScale: num("advStatusScale"),
+    timeScale: num("advTimeScale"),
+    nameWeight: num("advNameWeight"),
+    statusWeight: num("advStatusWeight"),
+    timeWeight: num("advTimeWeight"),
+    fontFamily: el("advFont").value,
+    s0Bg: el("advS0Bg").value,
+    s0Text: el("advS0Text").value,
+    s1Bg: el("advS1Bg").value,
+    s1Text: el("advS1Text").value,
+    s1Marquee: el("advS1Marquee").value,
+    s2Bg: el("advS2Bg").value,
+    s2Text: el("advS2Text").value,
+    gradient: (() => {
+      // 保存前把当前状态的表单值写回状态表，三个状态一起提交
+      // gdState 为 null 时用表单当前值兜底，避免抛异常导致保存中断
+      if (!gdState) gdState = [readGradientForm(), readGradientForm(), readGradientForm()];
+      gdState[gdCurStatus] = readGradientForm();
+      return { s0: gdState[0], s1: gdState[1], s2: gdState[2] };
+    })(),
+  };
+}
+
+// 加载当前大屏配置到表单
+async function loadAdvanced() {
+  const r = await fetch("/api/display");
+  const j = await r.json();
+  if (!j.ok) { setMsg("styleMsg", "加载失败", "err"); return; }
+  displaySettings = Object.assign({ width: 1920, height: 1080, cols: 6, order: [], nameFmt: "cn", cardW: 0, cardH: 0, advanced: {} }, j.data);
+  advOriginal = JSON.parse(JSON.stringify(displaySettings));
+  fillAdvancedForm(displaySettings);
+  applyStatusLabels(displaySettings.statusLabels);
+  applyGlobalStateColors();
+  setMsg("styleMsg", "已加载当前大屏配置", "ok");
+}
+
+// 保存配置（保留表单未覆盖的字段）
+async function saveAdvanced() {
+  try {
+    // 表单值必须嵌套到 advanced 下，后端只读取 display.advanced
+    const d = Object.assign({}, displaySettings, { advanced: readAdvancedForm() });
+    d.cols = Number(el("advCols").value);
+    d.cardW = Number(el("advCardW").value);
+    d.cardH = Number(el("advCardH").value);
+    // 班级排序：空输入回退到预设顺序；保留空段作为空白占位（, ,）
+    const orderTxt = el("advOrder").value;
+    d.order = orderTxt.trim()
+      ? orderTxt.split(",").map(x => x.trim())
+      : DEFAULT_ORDER.split(",");
+    const j = await api("/api/admin/display", { display: d });
+    if (!j.ok) { setMsg("styleMsg", j.msg || "保存失败", "err"); return; }
+    displaySettings = Object.assign(displaySettings, j.data);
+    advOriginal = JSON.parse(JSON.stringify(displaySettings));
+    setMsg("styleMsg", "设置已保存，刷新大屏页面后生效", "ok");
+  } catch (e) {
+    setMsg("styleMsg", "保存失败：" + (e && e.message ? e.message : String(e)), "err");
+  }
+}
+
+el("styleSave").addEventListener("click", saveAdvanced);
+
+// 放弃修改：恢复为上次加载/保存的配置
+el("styleRevert").addEventListener("click", () => {
+  if (advOriginal) {
+    displaySettings = JSON.parse(JSON.stringify(advOriginal));
+    fillAdvancedForm(displaySettings);
+    setMsg("styleMsg", "已恢复为上次加载的配置", "ok");
+  }
+});
+
+// Ctrl+S 快捷保存
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s" && !el("panel-style").classList.contains("hidden")) {
+    e.preventDefault();
+    saveAdvanced();
+  }
+});
+
+// ---------- 定时任务模块：三个独立定时器，每天自动重置所有班级为初始状态 ----------
+let scheduleData = { timers: [] };
+const TIMER_LABELS = ["定时器1", "定时器2", "定时器3"];
+
+// 时间格式化为 HH:MM
+function fmtTime(h, m) {
+  return String(h ?? 0).padStart(2, "0") + ":" + String(m ?? 0).padStart(2, "0");
+}
+
+// 渲染三个定时器卡片
+function renderTimers() {
+  const wrap = el("timerList");
+  const timers = scheduleData.timers || [];
+  wrap.innerHTML = timers.map(t => {
+    const statusText = t.lastStatus === "success" ? "执行成功" : t.lastStatus === "error" ? "执行失败" : "待执行";
+    const statusCls = t.lastStatus === "success" ? "s2" : t.lastStatus === "error" ? "s1" : "s0";
+    return `
+      <div class="timer-card" data-id="${t.id}">
+        <div class="timer-head">
+          <span class="timer-title">${t.label || TIMER_LABELS[t.id] || "定时器"}</span>
+          <span class="badge ${statusCls}">${statusText}</span>
+        </div>
+        <div class="timer-form">
+          <label class="switch-row">
+            <span class="switch-label">启用</span>
+            <span class="switch">
+              <input type="checkbox" class="timer-enabled" ${t.enabled ? "checked" : ""}>
+              <span class="slider"></span>
+            </span>
+          </label>
+          <label class="field">
+            <span>触发时间（每天）</span>
+            <input type="time" class="timer-time" value="${fmtTime(t.hour, t.minute)}" style="width:160px;">
+          </label>
+        </div>
+        <div class="timer-status">
+          <div class="status-row">
+            <span class="status-label">上次执行</span>
+            <span class="timer-lastrun">${t.lastRunTime || "—"}</span>
+          </div>
+          <div class="status-row">
+            <span class="status-label">执行结果</span>
+            <span class="timer-lastmsg">${t.lastMsg || "—"}</span>
+          </div>
+          <div class="status-row">
+            <span class="status-label">累计执行</span>
+            <span class="timer-count">${(t.count || 0) + " 次"}</span>
+          </div>
+        </div>
+        <div class="timer-actions">
+          <button class="btn btn-ghost timer-run">立即执行一次</button>
+        </div>
+      </div>`;
+  }).join("");
+
+  // 启用/禁用切换
+  wrap.querySelectorAll(".timer-enabled").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const card = cb.closest(".timer-card");
+      const tid = Number(card.dataset.id);
+      const t = scheduleData.timers.find(x => x.id === tid);
+      if (t) t.enabled = cb.checked;
+    });
+  });
+
+  // 触发时间变更
+  wrap.querySelectorAll(".timer-time").forEach(inp => {
+    inp.addEventListener("change", () => {
+      const card = inp.closest(".timer-card");
+      const tid = Number(card.dataset.id);
+      const t = scheduleData.timers.find(x => x.id === tid);
+      if (t && inp.value) {
+        const [h, m] = inp.value.split(":").map(Number);
+        t.hour = h; t.minute = m;
+      }
+    });
+  });
+
+  // 立即执行单个定时器
+  wrap.querySelectorAll(".timer-run").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const card = btn.closest(".timer-card");
+      const tid = Number(card.dataset.id);
+      const t = scheduleData.timers.find(x => x.id === tid);
+      if (!t) return;
+      if (!confirm(`确认立即执行${t.label}？将重置所有班级为${statusName(0)}状态。`)) return;
+      const j = await api("/api/admin/schedule", { run_now: true, timer_id: tid });
+      if (j.ok) {
+        scheduleData = j.data;
+        renderTimers();
+        setMsg("schedMsg", j.msg, "ok");
+        if (!el("panel-overview").classList.contains("hidden")) loadData();
+      } else {
+        setMsg("schedMsg", j.msg || "执行失败", "err");
+      }
+    });
+  });
+}
+
+// 加载定时任务配置与状态
+async function loadSchedule() {
+  const r = await fetch("/api/admin/schedule?token=" + encodeURIComponent(token));
+  const j = await r.json();
+  if (!j.ok) { setMsg("schedMsg", j.msg || "加载失败", "err"); return; }
+  scheduleData = j.data;
+  if (!Array.isArray(scheduleData.timers) || scheduleData.timers.length === 0) {
+    // 定时器1、定时器2 默认开启
+    scheduleData.timers = [0, 1, 2].map(id => ({ id, label: TIMER_LABELS[id], enabled: id < 2, hour: [8, 14, 21][id], minute: 0, lastRunDate: "", lastRunTime: "", lastStatus: "idle", lastMsg: "", count: 0 }));
+  }
+  renderTimers();
+}
+
+// 保存定时任务配置（收集三个定时器当前状态）
+el("schedSave").addEventListener("click", async () => {
+  const timers = scheduleData.timers.map(t => {
+    const card = el("timerList").querySelector(`.timer-card[data-id="${t.id}"]`);
+    const tm = card.querySelector(".timer-time").value || "00:00";
+    const [h, m] = tm.split(":").map(Number);
+    return {
+      id: t.id,
+      enabled: card.querySelector(".timer-enabled").checked,
+      hour: h, minute: m,
+    };
+  });
+  const j = await api("/api/admin/schedule", { schedule: { timers } });
+  if (j.ok) {
+    scheduleData = j.data;
+    renderTimers();
+    setMsg("schedMsg", j.msg, "ok");
+  } else {
+    setMsg("schedMsg", j.msg || "保存失败", "err");
+  }
+});
+
+// 状态总览三态页面切换
+el("tabBar").querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    currentStatus = Number(tab.dataset.status);
+    el("tabBar").querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    render();
+  });
+});
+
+// 已有 token 直接进入
+if (token) {
+  // 校验 token 有效性
+  fetch("/api/admin/teachers?token=" + encodeURIComponent(token))
+    .then(r => r.json())
+    .then(j => { if (j.ok) showMain(); else logout(); })
+    .catch(() => logout());
+}
+setInterval(load, 5000);
+</script>
+</body>
+</html>

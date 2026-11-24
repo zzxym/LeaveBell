@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>SchoolDisplay</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/display.css">
+</head>
+<body class="screen">
+  <div class="screen-stage" id="stage">
+    <div id="banner" class="banner hidden"></div>
+
+    <main id="cards" class="cards"></main>
+  </div>
+
+<div id="ctx-menu" style="display:none;position:fixed;z-index:99999;background:rgba(17,24,39,.96);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 0;min-width:170px;box-shadow:0 8px 30px rgba(0,0,0,.45);font:15px/1.6 system-ui,sans-serif;">
+  <div id="ctx-exit" style="padding:8px 18px;cursor:pointer;">退出大屏</div>
+</div>
+
+<script>
+// —— 翻页配置：在指定分辨率画布范围内进行整页内容切换，非页面自动滚动 ——
+const PAGE_INTERVAL = 8000; // 翻页间隔：每 8 秒切换到下一页
+const SCROLL_DURATION = 2000; // 翻页滑动特效时长（毫秒）
+let data = [];
+let carouselTimer = null;
+let scrollAnim = null;
+let pageIndex = 0;
+let pageTops = [0];
+let paged = false;
+// 班级名格式由管理端设置统一下发，大屏端只读取应用
+let displaySettings = { width: 1920, height: 1080, cols: 6, order: [], nameFmt: "cn" };
+
+// 三态样式类；状态名称不在此处硬编码，统一读取管理端下发的状态1/2/3名称
+const STATUS = {
+  0: { cls: "s0" },
+  1: { cls: "s1" },
+  2: { cls: "s2" },
+};
+function statusLabel(i) {
+  const labs = (Array.isArray(displaySettings.statusLabels)) ? displaySettings.statusLabels : [];
+  const n = labs[i];
+  return (n && String(n).trim()) ? String(n).trim() : "状态" + ((i % 3) + 1);
+}
+
+function elapsedTime(s) {
+  if (!s) return "";
+  const t0 = new Date(String(s).replace(" ", "T")).getTime();
+  if (!Number.isFinite(t0)) return "";
+  const secs = Math.max(0, Math.floor((Date.now() - t0) / 1000));
+  return Math.floor(secs / 60) + ":" + String(secs % 60).padStart(2, "0");
+}
+
+const CN_NUM = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+function cnNum(n) {
+  if (n <= 10) return CN_NUM[n];
+  if (n < 20) return "十" + CN_NUM[n - 10];
+  return String(n);
+}
+
+// 从班级名称解析年级与班号，如 "3年8班"
+function classLabel(c) {
+  const m = String(c.class_name).match(/(\d+)年(?:级)?(\d+)班/);
+  const grade = m ? m[1] : c.grade;
+  const num = m ? m[2] : "";
+  const g = cnNum(Number(grade));
+  if (displaySettings.nameFmt === "cn") return `${g}（${num}）`;
+  return `${g}年${num}班`;
+}
+
+// 应用班级名格式并重渲染（格式由管理端设置下发）
+function applyFmt() {
+  renderCards();
+}
+
+// ===== 渐变效果：配置 → CSS 变量（与管理端 set.html 一致） =====
+function gdHexRgb(hex) {
+  const h = String(hex || "#ffffff").replace("#", "");
+  if (h.length !== 6) return [255, 255, 255];
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+// 兼容旧版扁平结构：gradient 直接是单个配置时，三个状态共用
+// 各状态默认值：状态2渐变更亮，状态3默认关闭（与后端预置一致）
+const GD_DEFAULT = {
+  enabled: true, targets: ["text", "time"], mode: "flow", kind: "linear",
+  start: "#ffffff", end: "#fbbf24", midpoint: 50, opacity: 100,
+  direction: "ltr", loop: "pingpong", period: 1.5, spread: 200,
+};
+const GD_STATE_DEFAULT = [
+  GD_DEFAULT,
+  Object.assign({}, GD_DEFAULT, { end: "#ffefaa" }),
+  Object.assign({}, GD_DEFAULT, { enabled: false }),
+];
+function gdNormalize(g) {
+  const one = (src, i) => Object.assign({}, GD_STATE_DEFAULT[i], src || {});
+  if (!g || typeof g !== "object") return GD_STATE_DEFAULT.map((_, i) => one(null, i));
+  if (g.mode || g.targets || g.enabled !== undefined) return [one(g, 0), one(g, 1), one(g, 2)];
+  return [one(g.s0, 0), one(g.s1, 1), one(g.s2, 2)];
+}
+// 生成某个状态的渐变 CSS 变量，prefix 形如 "--gd0"
+function gradientVarsFor(g, set, prefix) {
+  g = g || {};
+  const on = g.enabled !== false;
+  set(prefix + "-enabled", on ? "1" : "0");
+  if (!on) { set(prefix + "-img", ""); set(prefix + "-anim", "none"); return; }
+  const alpha = (g.opacity === undefined ? 100 : Number(g.opacity)) / 100;
+  const [r1,gg1,b1] = gdHexRgb(g.start || "#ffffff");
+  const [r2,gg2,b2] = gdHexRgb(g.end || "#fbbf24");
+  const S = `rgba(${r1},${gg1},${b1},${alpha})`, E = `rgba(${r2},${gg2},${b2},${alpha})`;
+  const mid = Math.max(0, Math.min(100, Number(g.midpoint === undefined ? 50 : g.midpoint)));
+  const mid2 = Math.min(100, mid + Math.max(8, (100 - mid) / 2));
+  const dir = g.direction || "ltr";
+  const horizontal = dir === "ltr" || dir === "rtl";
+  const rev = dir === "rtl" || dir === "btt";
+  let img;
+  if (g.kind === "radial") {
+    img = `radial-gradient(circle, ${S} 0%, ${S} ${mid}%, ${E} ${mid2}%, ${E} 100%)`;
+  } else {
+    const ang = { ltr:"90deg", rtl:"270deg", ttb:"180deg", btt:"0deg" }[dir];
+    img = `linear-gradient(${ang}, ${S} 0%, ${S} ${mid}%, ${E} ${mid2}%, ${E} 100%)`;
+  }
+  set(prefix + "-img", img);
+  const spread = Math.max(100, Math.min(500, Number(g.spread === undefined ? 200 : g.spread))) / 100;
+  set(prefix + "-size", g.kind === "radial" ? `${spread*100}% ${spread*100}%`
+    : (horizontal ? `${spread*100}% 100%` : `100% ${spread*100}%`));
+  if (g.mode === "static") set(prefix + "-anim", "none");
+  else {
+    const anim = (g.kind === "radial") ? (rev ? "gd-x-rev" : "gd-x")
+      : (horizontal ? (rev ? "gd-x-rev" : "gd-x") : (rev ? "gd-y-rev" : "gd-y"));
+    set(prefix + "-anim", anim);
+  }
+  set(prefix + "-dur", `${Number(g.period === undefined ? 1.5 : g.period)}s`);
+  set(prefix + "-iter", g.loop === "loop" ? "infinite" : "infinite alternate");
+}
+// 三个状态分别下发变量
+function gradientVars(g, set) {
+  gdNormalize(g).forEach((cfg, i) => gradientVarsFor(cfg, set, `--gd${i}`));
+}
+
+// 把高级设置下发为 CSS 变量，驱动 display.css 中的卡片外观
+function applyAdvancedVars(target) {
+  const a = displaySettings.advanced || {};
+  const set = (key, value) => {
+    if (value === undefined || value === null || value === "") target.style.removeProperty(key);
+    else target.style.setProperty(key, String(value));
+  };
+  gradientVars(a.gradient, set);
+  const layout = Number(a.layout || 2);
+  const oneRow = layout === 1;
+  set("--card-dir", oneRow ? "row" : "column");
+  set("--meta-dir", layout <= 2 ? "row" : "column");
+  // 一排模式：三项文字同排，自动压缩字号并放宽下限，避免溢出
+  const f = oneRow ? 0.5 : 1;
+  set("--name-min", oneRow ? "8px" : "");
+  set("--status-min", oneRow ? "8px" : "");
+  set("--time-min", oneRow ? "8px" : "");
+  set("--card-radius", a.radius !== undefined ? a.radius + "px" : "");
+  set("--card-padding", a.padding);
+  set("--card-gap", a.gap);
+  set("--card-border-alpha", a.borderAlpha);
+  set("--name-scale", Number(a.nameScale || 60) * f);
+  set("--status-scale", Number(a.statusScale || 28) * f);
+  set("--time-scale", Number(a.timeScale || 28) * f);
+  set("--name-weight", a.nameWeight);
+  set("--status-weight", a.statusWeight);
+  set("--time-weight", a.timeWeight);
+  set("--card-font", a.fontFamily);
+  // 三态颜色：底色、文字色，以及放学跑马色
+  set("--s0-bg", a.s0Bg);
+  set("--s0-text", a.s0Text);
+  set("--s1-bg", a.s1Bg);
+  set("--s1-text", a.s1Text);
+  set("--s1-marquee", a.s1Marquee);
+  set("--s2-bg", a.s2Bg);
+  set("--s2-text", a.s2Text);
+}
+
+// 应用显示设置：设置画布尺寸、列数、班级块尺寸，并按实际屏幕等比缩放
+function applyDisplay() {
+  const stage = document.getElementById("stage");
+  stage.style.setProperty("--sw", displaySettings.width + "px");
+  stage.style.setProperty("--sh", displaySettings.height + "px");
+  stage.style.setProperty("--cols", displaySettings.cols);
+  // 班级块尺寸：cardW/cardH 为 0 时移除变量，由 CSS 回退到自动计算（列均分宽度、内容撑高度）
+  // 注意：不能设为空字符串，否则 var(--card-w, 1fr) 不会回退，导致 minmax 无效
+  if (displaySettings.cardW) stage.style.setProperty("--card-w", displaySettings.cardW + "px");
+  else stage.style.removeProperty("--card-w");
+  if (displaySettings.cardH) stage.style.setProperty("--card-h", displaySettings.cardH + "px");
+  else stage.style.removeProperty("--card-h");
+  applyAdvancedVars(stage);
+  fitStage();
+}
+
+// 等比缩放舞台画布，适配实际屏幕（保持比例，居中显示）
+function fitStage() {
+  const stage = document.getElementById("stage");
+  const sw = displaySettings.width;
+  const sh = displaySettings.height;
+  const scale = Math.min(window.innerWidth / sw, window.innerHeight / sh);
+  stage.style.transform = `scale(${scale})`;
+}
+window.addEventListener("resize", fitStage);
+
+async function fetchDisplay() {
+  const r = await fetch("/api/display");
+  const j = await r.json();
+  if (j.ok) {
+    displaySettings = Object.assign({ width: 1920, height: 1080, cols: 6, order: [], nameFmt: "cn", cardW: 0, cardH: 0, advanced: {} }, j.data);
+    applyDisplay();
+    applyFmt();
+  }
+}
+
+// 按管理端排版顺序构建班级列表：order 中的空字符串为占位（用 null 表示）
+function sortedClasses() {
+  const order = displaySettings.order || [];
+  if (order.length === 0) {
+    return data.slice().sort((a, b) => Number(a.class_id) - Number(b.class_id));
+  }
+  const map = new Map(data.map(c => [c.class_id, c]));
+  const list = [];
+  for (const id of order) {
+    if (id === "" || id === null || id === undefined) { list.push(null); continue; }
+    const c = map.get(id);
+    if (c) list.push(c);
+  }
+  // 排版中未出现的班级补到末尾，避免遗漏
+  const used = new Set(list.filter(Boolean).map(c => c.class_id));
+  data.filter(c => !used.has(c.class_id))
+    .sort((a, b) => Number(a.class_id) - Number(b.class_id))
+    .forEach(c => list.push(c));
+  return list;
+}
+
+// 让班级名文字恰好填满班级块：按实际渲染宽度微调字号，避免折行或被裁切
+function fitCardNames(root) {
+  root.querySelectorAll(".card").forEach(card => {
+    const nameEl = card.querySelector(".card-name");
+    if (!nameEl) return;
+    nameEl.style.fontSize = ""; // 回到 CSS 基准字号（cqw 比例）
+    const cs = getComputedStyle(card);
+    // 一排模式下名称与状态/时间同排，需扣除同行元素占位与间距
+    const meta = card.querySelector(".card-meta");
+    // 一排模式下班级名已在 meta 容器内，跳过自适应放大，由配置字号控制
+    if (meta && nameEl.parentElement === meta) return;
+    const reserved = cs.flexDirection === "row" && meta
+      ? meta.scrollWidth + (parseFloat(cs.columnGap) || 0) : 0;
+    const avail = card.clientWidth
+      - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth)
+      - reserved;
+    if (avail <= 0) return;
+    const textW = nameEl.scrollWidth;
+    if (textW <= 0 || textW <= avail) return;
+    const cur = parseFloat(getComputedStyle(nameEl).fontSize);
+    if (!cur) return;
+    // 第一轮：按比例缩小到恰好填满可用宽度
+    nameEl.style.fontSize = (cur * avail / textW) + "px";
+    // 第二轮：scrollWidth 取整可能仍差 1px，再收一次确保不溢出
+    const w2 = nameEl.scrollWidth;
+    if (w2 > avail) {
+      const fs2 = parseFloat(getComputedStyle(nameEl).fontSize);
+      nameEl.style.fontSize = (fs2 * avail / w2) + "px";
+    }
+  });
+}
+
+let speakingCid = "";
+
+function cardHtml(c) {
+  // 空占位卡片：仅占位，不显示任何文字
+  if (!c) return `<div class="card empty"></div>`;
+  const st = STATUS[c.status];
+  const adv = displaySettings.advanced || {};
+  const oneRow = adv.layout === 1;
+  // 渐变按状态分别配置：取该卡片状态对应的配置
+  const gd = gdNormalize(adv.gradient)[Math.max(0, Math.min(2, c.status))] || {};
+  const targets = (gd.enabled !== false && Array.isArray(gd.targets)) ? gd.targets : [];
+  const cls = st.cls + (targets.includes("bg") ? " gd-bg" : "");
+  const nameHtml = `<div class="card-name${targets.includes("name") ? " gd-elem" : ""}">${classLabel(c)}</div>`;
+  const statusHtml = `<div class="card-status${targets.includes("text") ? " gd-elem" : ""}">${statusLabel(c.status)}</div>`;
+  const counting = c.status === 1 || c.status === 2;
+  const timeText = counting ? elapsedTime(c.update_time) : "";
+  const timeHtml = timeText ? `<div class="card-time${targets.includes("time") ? " gd-elem" : ""}">${timeText}</div>` : "";
+  // 一排时把班级名也放进同一个 meta 容器，让整排共享一条连续渐变跑马
+  const content = oneRow
+    ? `<div class="card-meta">${nameHtml}${statusHtml}${timeHtml}</div>`
+    : `${nameHtml}<div class="card-meta">${statusHtml}${timeHtml}</div>`;
+  const speaking = speakingCid && c.class_id === speakingCid ? " speaking" : "";
+  return `
+    <div class="card ${cls}${speaking}" data-cid="${c.class_id || ""}">
+      ${content}
+    </div>`;
+}
+
+function renderCards() {
+  const wrap = document.getElementById("cards");
+  const list = sortedClasses();
+  if (list.length === 0) { wrap.innerHTML = ""; paged = false; return; }
+
+  const real = list.filter(Boolean);
+  const allDone = real.length >= 2 && real.every(c => c.status === 2);
+  if (allDone) {
+    wrap.innerHTML = `<div class="grade-done">已全部${statusLabel(2)}，同学们已安全离校</div>`;
+    paged = false;
+    return;
+  }
+  wrap.innerHTML = list.map(c => cardHtml(c)).join("");
+  fitCardNames(wrap);
+  computePages();
+}
+
+// 计算分页：所有班级平铺后按容器可视高度切页，记录每页起始滚动位置
+function computePages() {
+  const wrap = document.getElementById("cards");
+  const cards = Array.from(wrap.querySelectorAll(".card"));
+  const h = wrap.clientHeight;
+  if (!cards.length || h <= 0) { pageTops = [0]; paged = false; return; }
+  const tops = [0];
+  let pageTop = 0;
+  cards.forEach(card => {
+    if (card.offsetTop - pageTop >= h) {
+      pageTop = card.offsetTop;
+      tops.push(pageTop);
+    }
+  });
+  pageTops = tops;
+  paged = tops.length > 1;
+}
+
+// 平滑向上滑动到目标页，使用滑动特效过渡，时长由 SCROLL_DURATION 控制
+function scrollToPage(idx, animate) {
+  const wrap = document.getElementById("cards");
+  const target = pageTops[idx] || 0;
+  if (scrollAnim) cancelAnimationFrame(scrollAnim);
+  if (!animate) { wrap.scrollTop = target; return; }
+  const start = wrap.scrollTop;
+  const dist = target - start;
+  if (dist === 0) return;
+  const dur = SCROLL_DURATION;
+  const t0 = performance.now();
+  function step(now) {
+    const t = Math.min(1, (now - t0) / dur);
+    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    wrap.scrollTop = start + dist * e;
+    if (t < 1) scrollAnim = requestAnimationFrame(step);
+    else scrollAnim = null;
+  }
+  scrollAnim = requestAnimationFrame(step);
+}
+
+function startCarousel() {
+  clearTimeout(carouselTimer);
+  if (!paged) return;
+  carouselTimer = setTimeout(() => {
+    const next = (pageIndex + 1) % pageTops.length;
+    pageIndex = next;
+    scrollToPage(next, true);
+    startCarousel();
+  }, PAGE_INTERVAL);
+}
+
+async function fetchData() {
+  const r = await fetch("/api/classes");
+  const j = await r.json();
+  if (!j.ok) return;
+  data = j.data;
+  const prevPageCount = pageTops.length;
+  renderCards();
+  if (paged) {
+    if (pageIndex >= pageTops.length) pageIndex = 0;
+    // 仅在分页结构变化或尚未启动计时器时重启翻页计时器；
+    // 轮询刷新数据时不重置，否则翻页计时器会被 3 秒轮询不断打断，导致翻页无法触发
+    if (pageTops.length !== prevPageCount || !carouselTimer) {
+      scrollToPage(pageIndex, false);
+      startCarousel();
+    } else if (!scrollAnim) {
+      // 计时器运行中，保持当前页位置；翻页动画进行中则不打断
+      scrollToPage(pageIndex, false);
+    }
+  } else {
+    clearTimeout(carouselTimer);
+    carouselTimer = null;
+    document.getElementById("cards").scrollTop = 0;
+  }
+}
+
+applyFmt();
+fetchDisplay();
+fetchData();
+
+// 由管理端状态变化推送驱动刷新，不再定时轮询。
+// update：班级状态等数据变化，只拉数据；display：布局/样式变化，重新拉设置与数据。
+const events = new EventSource("/api/events");
+events.addEventListener("update", () => fetchData());
+events.addEventListener("display", () => { fetchDisplay(); fetchData(); });
+events.addEventListener("voice_start", (e) => {
+  try { speakingCid = (JSON.parse(e.data || "{}").class_id) || ""; } catch (_) { speakingCid = ""; }
+  renderCards();
+});
+events.addEventListener("voice_end", () => { speakingCid = ""; renderCards(); });
+
+// 每秒更新已过时长，不整页重渲染
+setInterval(() => {
+  document.querySelectorAll(".card[data-cid]").forEach(card => {
+    const c = data.find(x => x.class_id === card.dataset.cid);
+    if (!c || (c.status !== 1 && c.status !== 2)) return;
+    const node = card.querySelector(".card-time");
+    if (node) node.textContent = elapsedTime(c.update_time);
+  });
+}, 1000);
+
+// —— 静态资源版本自检：服务端页面/CSS 更新后自动刷新，绕过 kiosk/大屏浏览器的顽固缓存 ——
+(async function autoReloadOnAssetChange() {
+  try {
+    const r = await fetch("/api/ui-version", { cache: "no-store" });
+    const j = await r.json();
+    if (!j.ok) return;
+    const key = "sd_ui_ver";
+    const now = JSON.stringify(j.data);
+    const prev = sessionStorage.getItem(key);
+    if (prev === null) { sessionStorage.setItem(key, now); return; }
+    if (prev !== now) { sessionStorage.setItem(key, now); location.reload(); }
+  } catch (e) { /* 检测失败不影响大屏运行 */ }
+  // 每 30 秒检查一次
+  setTimeout(autoReloadOnAssetChange, 30000);
+})();
+
+// —— 右键菜单：退出大屏 ——
+(function () {
+  const menu = document.getElementById("ctx-menu");
+  if (!menu) return;
+  document.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    menu.style.display = "block";
+    menu.style.left = Math.min(e.clientX, window.innerWidth - 190) + "px";
+    menu.style.top = Math.min(e.clientY, window.innerHeight - 100) + "px";
+  });
+  document.addEventListener("click", (e) => {
+    if (!menu.contains(e.target)) menu.style.display = "none";
+  });
+  document.getElementById("ctx-exit").addEventListener("click", () => {
+    menu.style.display = "none";
+    // 直接关闭窗口，不替换页面内容（避免出现黑底提示框）
+    try { window.close(); } catch (e) { }
+  });
+})();
+</script>
+</body>
+</html>

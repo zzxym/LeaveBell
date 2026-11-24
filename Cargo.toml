@@ -1,0 +1,51 @@
+[package]
+name = "school-display"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "LeaveBell"
+path = "src/main.rs"
+
+[dependencies]
+# GUI
+eframe = "0.31"
+egui = "0.31"
+
+# HTTP 服务器（轻量、多线程，支持 SSE 长连接）
+tiny_http = "0.12"
+
+# JSON 与序列化
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# edge-tts（在线语音，基础版默认引擎，同步 blocking 模式）
+msedge-tts = "0.4"
+
+# 时间
+chrono = "0.4"
+
+# 随机数（会话 token）
+rand = "0.8"
+
+# 二维码生成（纯 Rust，无依赖，适合内网离线生成）
+qrcodegen = "1.8"
+
+# 授权：SHA256 机器码 / Ed25519 离线许可证
+ring = "0.17"
+base64 = "0.23"
+
+# Windows API（显示器枚举、网卡枚举）
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Media_Audio", "Win32_Media_Multimedia", "Win32_System_LibraryLoader", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_Networking_WinSock"] }
+
+# 构建期把 .ico 嵌入可执行文件（资源管理器/taskbar 显示的软件图标）
+[target.'cfg(windows)'.build-dependencies]
+embed-resource = "3.0"
+
+[profile.release]
+opt-level = 2
+lto = true
+strip = true
+codegen-units = 1
+panic = "abort"

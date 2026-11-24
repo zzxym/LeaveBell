@@ -1,0 +1,25 @@
+/target/
+/dist-native/
+/patch-melo/
+/g2pW/
+/全功能无注册/
+
+# 发布产物与运行数据
+*.exe
+*.dll
+*.pdb
+*.onnx
+*.fst
+*.utf8
+machine.txt
+license.json
+license-tool-result.txt
+
+# 授权私钥绝不入库
+license_private.key
+
+# 临时文件
+_chk.txt
+icon.png
+shot_grad.png
+verify-exe-icon.png
