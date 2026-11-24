@@ -3,10 +3,10 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 ARCH="$1"
-REF="${GITHUB_REF_NAME:-v1.2.0}"
+REF="${GITHUB_REF_NAME:-v1.0.0}"
 case "$REF" in
   v*) VER="${REF#v}" ;;
-  *) VER="1.2.0" ;;
+  *) VER="1.0.0" ;;
 esac
 
 SRC="dist-offline/linux-$ARCH"

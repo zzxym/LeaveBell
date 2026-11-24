@@ -10,32 +10,70 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-win:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            platform: win
-            arch: amd64
+          - arch: amd64
             target: x86_64-pc-windows-msvc
             runtime: https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.6/sherpa-onnx-v1.13.6-win-x64-shared-MT-Release-lib.tar.bz2
-          - os: windows-latest
-            platform: win
-            arch: arm64
+          - arch: arm64
             target: aarch64-pc-windows-msvc
             runtime: https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.6/sherpa-onnx-v1.13.6-win-arm64-shared-MT-Release-lib.tar.bz2
-          - os: ubuntu-latest
-            platform: linux
-            arch: amd64
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - name: Download offline assets
+        shell: bash
+        run: |
+          mkdir -p offline/runtime offline/model
+          curl -L --fail -o runtime.tar.bz2 "${{ matrix.runtime }}"
+          tar -xjf runtime.tar.bz2 -C offline/runtime
+          curl -L --fail -o model.tar.bz2 "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-melo-tts-zh_en.tar.bz2"
+          tar -xjf model.tar.bz2 -C offline/model --strip-components=1
+
+      - name: Build Windows packages
+        shell: pwsh
+        run: |
+          .\build-win.ps1 -Target "${{ matrix.target }}" -Arch "${{ matrix.arch }}"
+          $nsis = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          if (-not (Test-Path $nsis)) { choco install nsis -y --no-progress }
+          $pkg = "dist-native\school-display-${{ matrix.arch }}"
+          & $nsis /V2 /DARCH=${{ matrix.arch }} /DPKG_DIR="$pkg" installer.nsi
+          bash build-offline.sh win ${{ matrix.arch }}
+          $offline = "dist-offline\win-${{ matrix.arch }}"
+          & $nsis /V2 /DARCH=${{ matrix.arch }} /DPKG_DIR="$offline" installer-melo-patch.nsi
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-${{ matrix.arch }}
+          path: |
+            LeaveBell-Online-Setup-${{ matrix.arch }}.exe
+            LeaveBell-LocalVoice-Patch-${{ matrix.arch }}.exe
+          if-no-files-found: error
+
+  build-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
             target: x86_64-unknown-linux-gnu
             runtime: https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.6/sherpa-onnx-v1.13.6-linux-x64-shared-lib.tar.bz2
-          - os: ubuntu-latest
-            platform: linux
-            arch: arm64
+          - arch: arm64
             target: aarch64-unknown-linux-gnu
             runtime: https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.6/sherpa-onnx-v1.13.6-linux-aarch64-shared-cpu-lib.tar.bz2
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    env:
+      CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
 
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +83,6 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Install Linux dependencies
-        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libx11-dev libasound2-dev rpm
@@ -60,46 +97,42 @@ jobs:
           curl -L --fail -o model.tar.bz2 "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-melo-tts-zh_en.tar.bz2"
           tar -xjf model.tar.bz2 -C offline/model --strip-components=1
 
-      - name: Build Windows packages
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
-        run: |
-          .\build-win.ps1 -Target "${{ matrix.target }}" -Arch "${{ matrix.arch }}"
-          $nsis = 'C:\Program Files (x86)\NSIS\makensis.exe'
-          if (-not (Test-Path $nsis)) { choco install nsis -y --no-progress }
-          $pkg = "dist-native\school-display-${{ matrix.arch }}"
-          & $nsis /V2 /DARCH=${{ matrix.arch }} /DPKG_DIR="$pkg" installer.nsi
-          bash build-offline.sh win ${{ matrix.arch }}
-          $offline = "dist-offline\win-${{ matrix.arch }}"
-          & $nsis /V2 /DARCH=${{ matrix.arch }} /DPKG_DIR="$offline" installer-melo-patch.nsi
-
       - name: Build Linux packages
-        if: runner.os == 'Linux'
         shell: bash
-        env:
-          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
         run: |
           bash build-linux.sh "${{ matrix.target }}" "${{ matrix.arch }}"
           bash build-offline.sh linux "${{ matrix.arch }}"
           bash build-linux-packages.sh "${{ matrix.arch }}"
 
-      - name: Publish Windows release
-        if: runner.os == 'Windows'
-        uses: softprops/action-gh-release@v2
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
         with:
-          files: |
-            LeaveBell-Online-Setup-${{ matrix.arch }}.exe
-            LeaveBell-LocalVoice-Patch-${{ matrix.arch }}.exe
-          generate_release_notes: true
-
-      - name: Publish Linux release
-        if: runner.os == 'Linux'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
+          name: linux-${{ matrix.arch }}
+          path: |
             LeaveBell-Online-Linux-${{ matrix.arch }}.tar.gz
             LeaveBell-Offline-Linux-${{ matrix.arch }}.tar.gz
             LeaveBell-${{ matrix.arch }}.deb
             LeaveBell-${{ matrix.arch }}.rpm
+          if-no-files-found: error
+
+  release:
+    needs: [build-win, build-linux]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/LeaveBell-Online-Setup-*.exe
+            release/LeaveBell-LocalVoice-Patch-*.exe
+            release/LeaveBell-Online-Linux-*.tar.gz
+            release/LeaveBell-Offline-Linux-*.tar.gz
+            release/LeaveBell-*.deb
+            release/LeaveBell-*.rpm
+          generate_release_notes: true
