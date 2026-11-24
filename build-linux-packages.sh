@@ -72,7 +72,7 @@ EOD
 /usr/bin/LeaveBell
 /usr/share/applications/LeaveBell.desktop
 EOF
-rpmbuild -bb --define "_topdir $PWD/rpmbuild" --define "_sourcedir $PWD" rpmbuild/SPECS/LeaveBell.spec
+rpmbuild -bb --target "$RPM_ARCH" --define "_topdir $PWD/rpmbuild" --define "_sourcedir $PWD" rpmbuild/SPECS/LeaveBell.spec
 cp rpmbuild/RPMS/$RPM_ARCH/LeaveBell-$VER-1.*.rpm "LeaveBell-$ARCH.rpm"
 
 echo "Packages: LeaveBell-$ARCH.deb LeaveBell-$ARCH.rpm"
