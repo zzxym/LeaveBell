@@ -17,7 +17,7 @@ license-tool-result.txt
 
 # 授权私钥绝不入库
 license_private.key
-
+需求.md
 # 临时文件
 _chk.txt
 icon.png
