@@ -51,7 +51,6 @@ Version: $VER
 Release: 1
 Summary: LeaveBell school pickup display
 License: Proprietary
-BuildArch: $RPM_ARCH
 %description
 LeaveBell school pickup display with offline TTS.
 %install

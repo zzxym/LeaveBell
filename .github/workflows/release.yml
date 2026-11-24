@@ -43,8 +43,17 @@ jobs:
         shell: pwsh
         run: |
           .\build-win.ps1 -Target "${{ matrix.target }}" -Arch "${{ matrix.arch }}"
-          $nsis = 'C:\Program Files (x86)\NSIS\makensis.exe'
-          if (-not (Test-Path $nsis)) { choco install nsis -y --no-progress }
+          $nsisPaths = @('C:\Program Files (x86)\NSIS\makensis.exe', 'C:\Program Files\NSIS\makensis.exe')
+          $nsis = $nsisPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $nsis) {
+            winget install --id NSIS.NSIS --silent --accept-package-agreements --accept-source-agreements
+            $nsis = $nsisPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $nsis) {
+            choco install nsis -y --no-progress
+            $nsis = $nsisPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $nsis) { throw 'NSIS not found' }
           $pkg = "dist-native\school-display-${{ matrix.arch }}"
           & $nsis /V2 /DARCH=${{ matrix.arch }} /DPKG_DIR="$pkg" installer.nsi
           bash build-offline.sh win ${{ matrix.arch }}
