@@ -255,12 +255,8 @@ jobs:
               $dir = Split-Path $exePath
               $result = Join-Path $dir 'license-tool-result.txt'
               Remove-Item $result -ErrorAction SilentlyContinue
-              Push-Location $dir
-              try {
-                & $exePath --license-check
-                $code = $LASTEXITCODE
-              } finally { Pop-Location }
-              if ($code -ne 0) { throw "license-check failed: $onlineExe" }
+              $proc = Start-Process -FilePath $exePath -ArgumentList '--license-check' -WorkingDirectory $dir -Wait -PassThru -WindowStyle Hidden
+              if ($proc.ExitCode -ne 0) { throw "license-check failed: $onlineExe" }
               if (-not (Test-Path $result)) { throw "missing result: $result" }
               if ((Get-Content $result -Raw) -notmatch 'registered=') { throw "bad result: $result" }
               Remove-Item $result -ErrorAction SilentlyContinue
