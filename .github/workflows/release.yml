@@ -69,6 +69,17 @@ jobs:
             LeaveBell-LocalVoice-Patch-${{ matrix.arch }}.exe
           if-no-files-found: error
 
+      - name: Upload Windows payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-payload-${{ matrix.arch }}
+          path: |
+            dist-native/school-display-${{ matrix.arch }}/LeaveBell.exe
+            dist-offline/win-${{ matrix.arch }}/LeaveBell.exe
+            dist-offline/win-${{ matrix.arch }}/sherpa-onnx-c-api.dll
+            dist-offline/win-${{ matrix.arch }}/melo/models/sherpa-onnx-vits-zh-ll/model.onnx
+          if-no-files-found: error
+
   build-linux:
     strategy:
       fail-fast: false
@@ -201,8 +212,62 @@ jobs:
             esac
           done
 
+  verify-win:
+    needs: build-win
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: win-*
+          path: artifacts
+
+      - name: Verify Windows artifacts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Assert-File($path) {
+            if (-not (Test-Path $path)) { throw "Missing $path" }
+            if ((Get-Item $path).Length -le 0) { throw "Empty $path" }
+          }
+          function Assert-Pe($path) {
+            Assert-File $path
+            $stream = [System.IO.File]::OpenRead($path)
+            try { $b0 = $stream.ReadByte(); $b1 = $stream.ReadByte() } finally { $stream.Dispose() }
+            if ($b0 -ne 0x4D -or $b1 -ne 0x5A) { throw "Not PE: $path" }
+          }
+          foreach ($arch in @('amd64','arm64')) {
+            $setup = "artifacts/win-$arch/LeaveBell-Online-Setup-$arch.exe"
+            $patch = "artifacts/win-$arch/LeaveBell-LocalVoice-Patch-$arch.exe"
+            Assert-Pe $setup
+            Assert-Pe $patch
+            $payload = "artifacts/win-payload-$arch"
+            $onlineExe = "$payload/dist-native/school-display-$arch/LeaveBell.exe"
+            $offlineExe = "$payload/dist-offline/win-$arch/LeaveBell.exe"
+            $dll = "$payload/dist-offline/win-$arch/sherpa-onnx-c-api.dll"
+            $model = "$payload/dist-offline/win-$arch/melo/models/sherpa-onnx-vits-zh-ll/model.onnx"
+            Assert-Pe $onlineExe
+            Assert-Pe $offlineExe
+            Assert-File $dll
+            Assert-File $model
+            if ($arch -eq 'amd64') {
+              $dir = Split-Path $onlineExe
+              $result = Join-Path $dir 'license-tool-result.txt'
+              Remove-Item $result -ErrorAction SilentlyContinue
+              Push-Location $dir
+              try {
+                & $onlineExe --license-check
+                $code = $LASTEXITCODE
+              } finally { Pop-Location }
+              if ($code -ne 0) { throw "license-check failed: $onlineExe" }
+              if (-not (Test-Path $result)) { throw "missing result: $result" }
+              if ((Get-Content $result -Raw) -notmatch 'registered=') { throw "bad result: $result" }
+              Remove-Item $result -ErrorAction SilentlyContinue
+            }
+          }
+
   release:
-    needs: [build-win, build-linux, verify-linux]
+    needs: [build-win, build-linux, verify-linux, verify-win]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
 
