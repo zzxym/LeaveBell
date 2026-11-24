@@ -111,7 +111,8 @@ jobs:
         run: |
           bash build-linux.sh "${{ matrix.target }}" "${{ matrix.arch }}"
           bash build-offline.sh linux "${{ matrix.arch }}"
-          bash build-linux-packages.sh "${{ matrix.arch }}"
+          bash build-linux-packages.sh "${{ matrix.arch }}" offline
+          bash build-linux-packages.sh "${{ matrix.arch }}" online
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
@@ -122,6 +123,8 @@ jobs:
             LeaveBell-Offline-Linux-${{ matrix.arch }}.tar.gz
             LeaveBell-${{ matrix.arch }}.deb
             LeaveBell-${{ matrix.arch }}.rpm
+            LeaveBell-Online-${{ matrix.arch }}.deb
+            LeaveBell-Online-${{ matrix.arch }}.rpm
           if-no-files-found: error
 
   release:

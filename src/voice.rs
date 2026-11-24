@@ -113,6 +113,13 @@ impl VoiceEngine {
         if engine == "edge" {
             return edge_voices();
         }
+        if engine != "sherpa" {
+            return vec![];
+        }
+        let model = self.base.join("melo").join("models").join("sherpa-onnx-vits-zh-ll").join("model.onnx");
+        if !model.is_file() {
+            return vec![];
+        }
         // sherpa-onnx VITS（MeloTTS）：仅保留两个说话人，显示为女声/男声（前端映射）
         vec![
             "sherpa-onnx-vits-zh-ll/2".into(),

@@ -310,6 +310,13 @@
               <input id="vcEnabled" type="checkbox" style="width:auto;">
             </label>
             <label class="field">
+              <span>语音引擎</span>
+              <select id="vcEngine" style="width:220px;">
+                <option value="edge">在线 TTS（Edge）</option>
+                <option value="sherpa">离线 TTS（本地）</option>
+              </select>
+            </label>
+            <label class="field">
               <span>音色</span>
               <select id="vcVoice" style="width:220px;"></select>
             </label>
@@ -1179,20 +1186,28 @@ async function loadScan() {
 }
 
 // ---------- 语音播报设置 ----------
+async function loadVoiceVoices(engine, prev) {
+  const r = await fetch("/api/voice?engine=" + encodeURIComponent(engine));
+  const j = await r.json();
+  if (!j.ok) return;
+  const voices = j.data.voices || [];
+  const sel = el("vcVoice");
+  const options = voices.length
+    ? voices.map(v => `<option value="${v}">${v}</option>`).join("")
+    : `<option value="">（暂无音色）</option>`;
+  sel.innerHTML = options;
+  sel.value = voices.includes(prev) ? prev : (voices[0] || "");
+}
+
 async function loadVoice() {
   try {
     const r = await fetch("/api/voice");
     const j = await r.json();
     if (!j.ok) return;
     const s = j.data.settings || {};
-    const voices = j.data.voices || [];
-    const sel = el("vcVoice");
-    const prev = s.voice || "";
-    const options = voices.length
-      ? voices.map(v => `<option value="${v}">${v}</option>`).join("")
-      : `<option value="">（暂无音色）</option>`;
-    sel.innerHTML = options;
-    sel.value = voices.includes(prev) ? prev : (voices[0] || "");
+    const engine = s.engine === "sherpa" ? "sherpa" : "edge";
+    el("vcEngine").value = engine;
+    await loadVoiceVoices(engine, s.voice || "");
     el("vcEnabled").checked = !!s.enabled;
     const speed = Number(s.speed) || 1;
     const volume = Number(s.volume);
@@ -1204,12 +1219,15 @@ async function loadVoice() {
   } catch (e) { el("vcMsg").textContent = "加载语音设置失败"; }
 }
 
+el("vcEngine").addEventListener("change", e => { loadVoiceVoices(e.target.value, ""); });
+
 el("vcSpeed").addEventListener("input", e => { el("vcSpeedOut").textContent = Number(e.target.value).toFixed(2); });
 el("vcVolume").addEventListener("input", e => { el("vcVolumeOut").textContent = Math.round(Number(e.target.value) * 100) + "%"; });
 
 function collectVoiceSettings() {
   return {
     enabled: !!el("vcEnabled").checked,
+    engine: el("vcEngine").value || "edge",
     voice: el("vcVoice").value || "",
     speed: Number(el("vcSpeed").value),
     volume: Number(el("vcVolume").value)

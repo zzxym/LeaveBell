@@ -3,14 +3,19 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 ARCH="$1"
+VARIANT="${2:-offline}"
 REF="${GITHUB_REF_NAME:-v1.0.0}"
 case "$REF" in
   v*) VER="${REF#v}" ;;
   *) VER="1.0.0" ;;
 esac
 
-SRC="dist-offline/linux-$ARCH"
-[ -d "$SRC" ] || { echo "缺少离线包: $SRC"; exit 1; }
+case "$VARIANT" in
+  offline) SRC="dist-offline/linux-$ARCH"; OUT="LeaveBell-$ARCH" ;;
+  online) SRC="dist-linux/LeaveBell-$ARCH"; OUT="LeaveBell-Online-$ARCH" ;;
+  *) echo "未知版本: $VARIANT"; exit 1 ;;
+esac
+[ -d "$SRC" ] || { echo "缺少包源: $SRC"; exit 1; }
 
 case "$ARCH" in
   amd64) DEB_ARCH=amd64; RPM_ARCH=x86_64 ;;
@@ -42,7 +47,7 @@ Architecture: $DEB_ARCH
 Maintainer: School <admin@local>
 Description: LeaveBell school pickup display
 EOF
-dpkg-deb --build "$STAGE" "LeaveBell-$ARCH.deb"
+dpkg-deb --build "$STAGE" "$OUT.deb"
 
 mkdir -p rpmbuild/BUILD rpmbuild/RPMS rpmbuild/SOURCES rpmbuild/SPECS rpmbuild/SRPMS
 cat > rpmbuild/SPECS/LeaveBell.spec <<EOF
@@ -52,7 +57,7 @@ Release: 1
 Summary: LeaveBell school pickup display
 License: Proprietary
 %description
-LeaveBell school pickup display with offline TTS.
+LeaveBell school pickup display.
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}/opt/LeaveBell %{buildroot}/usr/bin %{buildroot}/usr/share/applications
@@ -72,6 +77,6 @@ EOD
 /usr/share/applications/LeaveBell.desktop
 EOF
 rpmbuild -bb --target "$RPM_ARCH" --define "_topdir $PWD/rpmbuild" --define "_sourcedir $PWD" rpmbuild/SPECS/LeaveBell.spec
-cp rpmbuild/RPMS/$RPM_ARCH/LeaveBell-$VER-1.*.rpm "LeaveBell-$ARCH.rpm"
+cp rpmbuild/RPMS/$RPM_ARCH/LeaveBell-$VER-1.*.rpm "$OUT.rpm"
 
-echo "Packages: LeaveBell-$ARCH.deb LeaveBell-$ARCH.rpm"
+echo "Packages: $OUT.deb $OUT.rpm"
