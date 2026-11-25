@@ -643,6 +643,7 @@ pub struct App {
     license_state: Arc<Mutex<crate::license::LicenseState>>,
     reg_open: bool,
     reg_msg: String,
+    license_path_input: String,
     last_ontop: Option<bool>,
 }
 
@@ -704,6 +705,7 @@ impl App {
             license_state,
             reg_open: false,
             reg_msg: String::new(),
+            license_path_input: String::new(),
             last_ontop: None,
         }
     }
@@ -829,7 +831,9 @@ impl App {
         };
         let mut machine_text = machine_text;
         let message = self.reg_msg.clone();
+        let mut license_path = self.license_path_input.clone();
         let mut recheck = false;
+        let mut import = false;
         let mut close = false;
         egui::Window::new("软件注册")
             .collapsible(false).resizable(false)
@@ -844,12 +848,28 @@ impl App {
                 if !warn.is_empty() { ui.colored_label(Color32::from_rgb(220, 120, 40), &warn); }
                 if !message.is_empty() { ui.colored_label(Color32::from_rgb(220, 60, 60), &message); }
                 ui.separator();
-                ui.label("把 license.json 放到 exe 目录后点“重新验证”。");
+                ui.label("指定 license.json 路径（可粘贴完整路径），导入后自动复制到 exe 目录并验证：");
+                ui.add(egui::TextEdit::singleline(&mut license_path).desired_width(500.0));
                 ui.horizontal(|ui| {
+                    if ui.button("导入并验证").clicked() { import = true; }
                     if ui.button("重新验证").clicked() { recheck = true; }
                     if ui.button("关闭").clicked() { close = true; }
                 });
             });
+        self.license_path_input = license_path;
+        if import {
+            let base = std::env::current_exe()
+                .ok().and_then(|p| p.parent().map(|x| x.to_path_buf()))
+                .unwrap_or_default();
+            let result = std::fs::read(&self.license_path_input)
+                .map_err(|e| format!("读取 license.json 失败：{}", e))
+                .and_then(|bytes| std::fs::write(crate::license::license_file_path(&base), bytes)
+                    .map_err(|e| format!("写入 license.json 失败：{}", e)));
+            match result {
+                Ok(()) => recheck = true,
+                Err(e) => self.reg_msg = e,
+            }
+        }
         if recheck {
             let base = std::env::current_exe()
                 .ok().and_then(|p| p.parent().map(|x| x.to_path_buf()))

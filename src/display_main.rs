@@ -10,7 +10,7 @@
 #[allow(dead_code)] mod voice;
 
 use crate::app::{draw_display_grid_for_client, setup_chinese_font_once};
-use eframe::egui::{self, ViewportBuilder, ViewportCommand};
+use eframe::egui::{self, Pos2, Vec2, ViewportBuilder, ViewportCommand};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
@@ -23,6 +23,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 struct DisplayConfig {
     controller: String,
     voice: bool,
+    screen: Option<String>,
 }
 
 impl Default for DisplayConfig {
@@ -33,7 +34,7 @@ impl Default for DisplayConfig {
         } else {
             "http://127.0.0.1:80"
         };
-        Self { controller: controller.into(), voice: true }
+        Self { controller: controller.into(), voice: true, screen: None }
     }
 }
 
@@ -209,15 +210,32 @@ impl DisplayApp {
     }
 }
 
+fn move_to_screen(ctx: &egui::Context, screen: &monitors::ScreenInfo) {
+    ctx.send_viewport_cmd(ViewportCommand::Fullscreen(false));
+    ctx.send_viewport_cmd(ViewportCommand::OuterPosition(Pos2::new(screen.x as f32, screen.y as f32)));
+    ctx.send_viewport_cmd(ViewportCommand::InnerSize(Vec2::new(screen.width as f32, screen.height as f32)));
+    ctx.send_viewport_cmd(ViewportCommand::Fullscreen(true));
+}
+
 impl eframe::App for DisplayApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         setup_chinese_font_once(ctx);
         ctx.request_repaint_after(Duration::from_millis(500));
         if !self.fullscreen_set {
-            ctx.send_viewport_cmd(ViewportCommand::Fullscreen(true));
+            if let Some(sid) = self.cfg.screen.as_deref() {
+                if let Some(s) = self.screens.iter().find(|s| s.id == sid) {
+                    move_to_screen(ctx, s);
+                } else {
+                    ctx.send_viewport_cmd(ViewportCommand::Fullscreen(true));
+                }
+            } else {
+                ctx.send_viewport_cmd(ViewportCommand::Fullscreen(true));
+            }
             self.fullscreen_set = true;
         }
-        if ctx.input(|i| i.key_pressed(egui::Key::F2)) { self.settings_open = true; }
+        if ctx.input(|i| i.key_pressed(egui::Key::F2) || i.pointer.secondary_clicked()) {
+            self.settings_open = true;
+        }
         self.refresh();
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -225,7 +243,7 @@ impl eframe::App for DisplayApp {
                 ui.centered_and_justified(|ui| {
                     ui.vertical(|ui| {
                         ui.heading("未连接到控制器");
-                        ui.label(format!("当前地址：{}　按 F2 打开设置修改", self.cfg.controller));
+                        ui.label(format!("当前地址：{}　按 F2 或右键打开设置修改", self.cfg.controller));
                     });
                 });
             } else {
@@ -237,7 +255,7 @@ impl eframe::App for DisplayApp {
         let mut open = self.settings_open;
         let mut save = false;
         let msg = self.msg.clone();
-        egui::Window::new("大屏端设置 (F2)")
+        egui::Window::new("大屏端设置 (F2 / 右键)")
             .open(&mut open)
             .show(ctx, |ui| {
                 ui.label("控制器地址");
@@ -245,6 +263,17 @@ impl eframe::App for DisplayApp {
                 ui.checkbox(&mut self.voice_input, "语音播放");
                 if ui.button("保存").clicked() { save = true; }
                 if !msg.is_empty() { ui.label(&msg); }
+                ui.separator();
+                ui.label("大屏显示屏幕");
+                for screen in &self.screens {
+                    if ui.button(&screen.name).clicked() {
+                        move_to_screen(ctx, screen);
+                        self.cfg.screen = Some(screen.id.clone());
+                        self.cfg.save(&self.cfg_path);
+                    }
+                }
+                ui.separator();
+                if ui.button("退出软件").clicked() { std::process::exit(0); }
             });
         self.settings_open = open;
         if save { self.save_settings(); }

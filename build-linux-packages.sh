@@ -54,6 +54,12 @@ Architecture: $DEB_ARCH
 Maintainer: School <admin@local>
 Description: $TITLE
 EOF
+cat > "$STAGE/DEBIAN/postinst" <<EOF
+#!/bin/sh
+chmod a+w "/opt/$OPT"
+exit 0
+EOF
+chmod +x "$STAGE/DEBIAN/postinst"
 dpkg-deb --build "$STAGE" "$OUT.deb"
 
 mkdir -p rpmbuild/BUILD rpmbuild/RPMS rpmbuild/SOURCES rpmbuild/SPECS rpmbuild/SRPMS
@@ -78,6 +84,8 @@ Exec=/usr/bin/$LINK
 Terminal=false
 Categories=Education;
 EOD
+%post
+chmod a+w "/opt/$OPT"
 %files
 /opt/$OPT
 /usr/bin/$LINK
