@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 ARCH="$1"
-VARIANT="${2:-offline}"
+VARIANT="${2:-online}"
 REF="${GITHUB_REF_NAME:-v2.0.0}"
 case "$REF" in
   v*) VER="${REF#v}" ;;
@@ -11,8 +11,15 @@ case "$REF" in
 esac
 
 case "$VARIANT" in
-  offline) SRC="dist-offline/linux-$ARCH"; OUT="LeaveBell-$ARCH" ;;
-  online) SRC="dist-linux/LeaveBell-$ARCH"; OUT="LeaveBell-Online-$ARCH" ;;
+  online)
+    SRC="dist-linux/online-$ARCH"; PKG="leavebell-online"; OUT="LeaveBell-online-linux-$ARCH"
+    OPT="LeaveBell-online"; MAIN="LeaveBell"; LINK="LeaveBell-online"; DESKTOP="LeaveBellOnline"; TITLE="LeaveBell Online" ;;
+  offline)
+    SRC="dist-offline/linux-$ARCH"; PKG="leavebell-offline"; OUT="LeaveBell-offline-linux-$ARCH"
+    OPT="LeaveBell-offline"; MAIN="LeaveBell"; LINK="LeaveBell-offline"; DESKTOP="LeaveBellOffline"; TITLE="LeaveBell Offline" ;;
+  screen)
+    SRC="dist-linux/screen-$ARCH"; PKG="leavebell-screen"; OUT="LeaveBell-screen-linux-$ARCH"
+    OPT="LeaveBell-screen"; MAIN="LeaveBellDisplay"; LINK="LeaveBellScreen"; DESKTOP="LeaveBellScreen"; TITLE="LeaveBell Screen" ;;
   *) echo "未知版本: $VARIANT"; exit 1 ;;
 esac
 [ -d "$SRC" ] || { echo "缺少包源: $SRC"; exit 1; }
@@ -23,60 +30,60 @@ case "$ARCH" in
   *) echo "未知架构: $ARCH"; exit 1 ;;
 esac
 
-STAGE="dist-packages/linux-$ARCH"
+STAGE="dist-packages/linux-$ARCH-$VARIANT"
 rm -rf "$STAGE" rpmbuild
-mkdir -p "$STAGE/opt/LeaveBell" "$STAGE/usr/bin" "$STAGE/usr/share/applications"
-cp -r "$SRC/." "$STAGE/opt/LeaveBell/"
-cat > "$STAGE/usr/share/applications/LeaveBell.desktop" <<EOF
+mkdir -p "$STAGE/opt/$OPT" "$STAGE/usr/bin" "$STAGE/usr/share/applications"
+cp -r "$SRC/." "$STAGE/opt/$OPT/"
+cat > "$STAGE/usr/share/applications/$DESKTOP.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=LeaveBell
-Exec=/usr/bin/LeaveBell
+Name=$TITLE
+Exec=/usr/bin/$LINK
 Terminal=false
 Categories=Education;
 EOF
-ln -s /opt/LeaveBell/LeaveBell "$STAGE/usr/bin/LeaveBell"
+ln -s "/opt/$OPT/$MAIN" "$STAGE/usr/bin/$LINK"
 
 mkdir -p "$STAGE/DEBIAN"
 cat > "$STAGE/DEBIAN/control" <<EOF
-Package: leavebell
+Package: $PKG
 Version: $VER
 Section: education
 Priority: optional
 Architecture: $DEB_ARCH
 Maintainer: School <admin@local>
-Description: LeaveBell school pickup display
+Description: $TITLE
 EOF
 dpkg-deb --build "$STAGE" "$OUT.deb"
 
 mkdir -p rpmbuild/BUILD rpmbuild/RPMS rpmbuild/SOURCES rpmbuild/SPECS rpmbuild/SRPMS
 cat > rpmbuild/SPECS/LeaveBell.spec <<EOF
-Name: LeaveBell
+Name: $PKG
 Version: $VER
 Release: 1
-Summary: LeaveBell school pickup display
+Summary: $TITLE
 License: Proprietary
 %description
-LeaveBell school pickup display.
+$TITLE
 %install
 rm -rf %{buildroot}
-mkdir -p %{buildroot}/opt/LeaveBell %{buildroot}/usr/bin %{buildroot}/usr/share/applications
-cp -a %{_sourcedir}/$SRC/. %{buildroot}/opt/LeaveBell/
-ln -s /opt/LeaveBell/LeaveBell %{buildroot}/usr/bin/LeaveBell
-cat > %{buildroot}/usr/share/applications/LeaveBell.desktop <<'EOD'
+mkdir -p %{buildroot}/opt/$OPT %{buildroot}/usr/bin %{buildroot}/usr/share/applications
+cp -a %{_sourcedir}/$SRC/. %{buildroot}/opt/$OPT/
+ln -s /opt/$OPT/$MAIN %{buildroot}/usr/bin/$LINK
+cat > %{buildroot}/usr/share/applications/$DESKTOP.desktop <<'EOD'
 [Desktop Entry]
 Type=Application
-Name=LeaveBell
-Exec=/usr/bin/LeaveBell
+Name=$TITLE
+Exec=/usr/bin/$LINK
 Terminal=false
 Categories=Education;
 EOD
 %files
-/opt/LeaveBell
-/usr/bin/LeaveBell
-/usr/share/applications/LeaveBell.desktop
+/opt/$OPT
+/usr/bin/$LINK
+/usr/share/applications/$DESKTOP.desktop
 EOF
 rpmbuild -bb --target "$RPM_ARCH" --define "_topdir $PWD/rpmbuild" --define "_sourcedir $PWD" rpmbuild/SPECS/LeaveBell.spec
-cp rpmbuild/RPMS/$RPM_ARCH/LeaveBell-$VER-1.*.rpm "$OUT.rpm"
+cp rpmbuild/RPMS/$RPM_ARCH/$PKG-$VER-1.*.rpm "$OUT.rpm"
 
 echo "Packages: $OUT.deb $OUT.rpm"

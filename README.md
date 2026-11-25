@@ -1,53 +1,49 @@
 # LeaveBell
 
+## 发布版本
 
+`v2.0.0` 起发布三个独立版本，命名统一为 `online` / `offline` / `screen`：
 
-## 语音版本
+| 版本 | Windows | Linux | 说明 |
+| --- | --- | --- | --- |
+| online | `LeaveBell-online-windows-amd64.exe` | `LeaveBell-online-linux-amd64.deb` / `.rpm` | 控制器 + 大屏端，EdgeTTS 在线语音 |
+| offline | `LeaveBell-offline-windows-amd64.exe` | `LeaveBell-offline-linux-amd64.deb` / `.rpm` | 控制器 + 大屏端 + MeloTTS 离线模型，可独立部署 |
+| screen | `LeaveBell-screen-windows-amd64.exe` | `LeaveBell-screen-linux-amd64.deb` / `.rpm` | 独立大屏端，仅播放控制器推送的数据和音频 |
 
-项目提供两个发行包：
+Linux 只发布 `amd64` / `arm64` 的 deb 和 rpm，不再发布 tar.gz；Windows 只发布 `amd64`。
 
-| 版本 | 安装包 | 语音引擎 |
-| --- | --- | --- |
-| 在线语音精简版 | `LeaveBell-Online-Setup-<架构>.exe` | EdgeTTS（在线，Rust 原生 `msedge-tts`） |
-| 本地语音包补丁 | `LeaveBell-LocalVoice-Patch-<架构>.exe` | EdgeTTS（在线）+ MeloTTS（离线，sherpa-onnx VITS，需先装精简版） |
-
-`v2.0.0` 起安装包内含 `LeaveBellDisplay` 独立大屏端；控制器合成音频，大屏端/网页大屏负责播放。控制器可同时服务多个大屏。
-
-本地语音包补丁在精简版基础上叠加，不单独运行；安装后可在管理端切换语音引擎。离线音色使用模型说话人 2 / 3，界面显示为「女声」「男声」。
+控制器合成音频，大屏端/网页大屏负责播放。控制器可同时服务多个大屏。本地大屏开关默认开启，可在控制器界面关闭。
 
 ## 目录结构
 
 ```
 Cargo.toml / Cargo.lock   Rust 工程
-src/                      Rust 源码（main/app/http_server/model/monitors/voice.rs）
-web/                      精简版前端资源（大屏 / 老师端 / 管理端）
-web-melo/                 补丁版前端资源源（含语音引擎选择 UI）
-patch-melo/payload/       本地语音补丁内容
-  web/                    补丁安装的前端资源
-  melo/                   MeloTTS（sherpa-onnx VITS 中文）模型与运行时 DLL
-assets/ preset/           图标与预置数据
-build.rs                  构建脚本
-build-win.ps1             Windows 发行目录构建
-installer.nsi             精简版 NSIS 脚本
-installer-melo-patch.nsi  补丁版 NSIS 脚本
-dist/                     构建输出
+src/                      Rust 源码
+web/                      大屏 / 老师端 / 管理端前端资源
+assets/ preset/           图标、字体许可证与预置数据
+build-win.ps1             Windows 构建，生成 online / screen 载荷
+build-offline.sh          生成 offline 完整载荷
+build-linux.sh            Linux 构建，生成 online / screen 载荷
+build-linux-packages.sh   生成 online / offline / screen 的 deb / rpm
+installer.nsi             参数化 NSIS 脚本，生成三个 Windows 独立安装包
+.github/workflows/        Windows/Linux 多 job 构建、产物检测与发布
 ```
 
 ## 构建与运行
 
-需要 Rust 工具链（stable）。
+需要 Rust stable 工具链。
 
 ```
 cargo build --release
 cargo run --release
 ```
 
+`LeaveBell` 是控制器，`LeaveBellDisplay` 是独立大屏端。大屏端按 `F2` 打开设置，填写控制器地址，并可开关语音播放（默认开启）。
+
 ## 持久化数据
 
-所有数据（班级设置、教师绑定、日志、大屏与定时配置、语音设置、端口）保存在**二进制文件同层目录的 `data/data.json`**，每次运行从该文件读取，无需额外配置文件。
-
+数据保存在二进制文件同层的 `data/data.json`。独立大屏端配置保存在同层的 `display-config.json`。
 
 ## 状态流转
 
 `(0) → (1) → (2)`，单向不可逆。回退需在管理端「修正」并填写原因，记录日志。
-

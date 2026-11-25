@@ -11,33 +11,41 @@ cargo "${build_args[@]}"
 
 bin="target/${TARGET:+$TARGET/}release/LeaveBell"
 [ -f "$bin" ] || bin="target/release/LeaveBell"
+screen_bin="$(dirname "$bin")/LeaveBellDisplay"
 
-out="dist-linux/LeaveBell-$ARCH"
-rm -rf "$out"
-mkdir -p "$out/web" "$out/data"
+online="dist-linux/online-$ARCH"
+screen="dist-linux/screen-$ARCH"
+for out in "$online" "$screen"; do
+  rm -rf "$out"
+  mkdir -p "$out"
+done
+mkdir -p "$online/web" "$online/data"
 
-cp "$bin" "$out/LeaveBell.bin"
-cp "$(dirname "$bin")/LeaveBellDisplay" "$out/LeaveBellDisplay.bin"
-cp "assets/OFL-Noto-CJK.txt" "$out/OFL-Noto-CJK.txt"
-cat > "$out/LeaveBell" <<'EOF'
+cp "$bin" "$online/LeaveBell.bin"
+cp "$screen_bin" "$online/LeaveBellDisplay.bin"
+cp "$screen_bin" "$screen/LeaveBellDisplay.bin"
+cp "assets/OFL-Noto-CJK.txt" "$online/OFL-Noto-CJK.txt"
+cp "assets/OFL-Noto-CJK.txt" "$screen/OFL-Noto-CJK.txt"
+cat > "$online/LeaveBell" <<'EOF'
 #!/usr/bin/env bash
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 export LD_LIBRARY_PATH="$DIR:${LD_LIBRARY_PATH:-}"
 exec "$DIR/LeaveBell.bin" "$@"
 EOF
-cat > "$out/LeaveBellDisplay" <<'EOF'
+cat > "$online/LeaveBellDisplay" <<'EOF'
 #!/usr/bin/env bash
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 exec "$DIR/LeaveBellDisplay.bin" "$@"
 EOF
-chmod +x "$out/LeaveBell" "$out/LeaveBellDisplay"
+cp "$online/LeaveBellDisplay" "$screen/LeaveBellDisplay"
+chmod +x "$online/LeaveBell" "$online/LeaveBellDisplay" "$screen/LeaveBellDisplay"
 
-cp -r web/. "$out/web/"
+cp -r web/. "$online/web/"
 if [ -f dist/school-display/data/data.json ]; then
-  cp dist/school-display/data/data.json "$out/data/"
+  cp dist/school-display/data/data.json "$online/data/"
 else
-  printf '{}' > "$out/data/data.json"
+  printf '{}' > "$online/data/data.json"
 fi
 
-tar -czf "LeaveBell-Online-Linux-$ARCH.tar.gz" -C dist-linux "LeaveBell-$ARCH"
-echo "Output: $(pwd)/LeaveBell-Online-Linux-$ARCH.tar.gz"
+echo "Online payload: $(pwd)/$online"
+echo "Screen payload: $(pwd)/$screen"

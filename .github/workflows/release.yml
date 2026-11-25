@@ -18,9 +18,6 @@ jobs:
           - arch: amd64
             target: x86_64-pc-windows-msvc
             runtime: https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.6/sherpa-onnx-v1.13.6-win-x64-shared-MT-Release-lib.tar.bz2
-          - arch: arm64
-            target: aarch64-pc-windows-msvc
-            runtime: https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.6/sherpa-onnx-v1.13.6-win-arm64-shared-MT-Release-lib.tar.bz2
     runs-on: windows-latest
 
     steps:
@@ -43,6 +40,7 @@ jobs:
         shell: pwsh
         run: |
           .\build-win.ps1 -Target "${{ matrix.target }}" -Arch "${{ matrix.arch }}"
+          bash build-offline.sh win ${{ matrix.arch }}
           $nsisPaths = @('C:\Program Files (x86)\NSIS\makensis.exe', 'C:\Program Files\NSIS\makensis.exe')
           $nsis = $nsisPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $nsis) {
@@ -54,19 +52,18 @@ jobs:
             $nsis = $nsisPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
           }
           if (-not $nsis) { throw 'NSIS not found' }
-          $pkg = "dist-native\school-display-${{ matrix.arch }}"
-          & $nsis /V2 /DARCH=${{ matrix.arch }} /DPKG_DIR="$pkg" installer.nsi
-          bash build-offline.sh win ${{ matrix.arch }}
-          $offline = "dist-offline\win-${{ matrix.arch }}"
-          & $nsis /V2 /DARCH=${{ matrix.arch }} /DPKG_DIR="$offline" installer-melo-patch.nsi
+          & $nsis /V2 /DARCH=${{ matrix.arch }} /DVARIANT=online '/DAPP_TITLE=LeaveBell Online' '/DAPP_DIR=LeaveBell-online' '/DREG_KEY=Software\LeaveBell\online' /DPKG_DIR="dist-native\online-${{ matrix.arch }}" installer.nsi
+          & $nsis /V2 /DARCH=${{ matrix.arch }} /DVARIANT=offline '/DAPP_TITLE=LeaveBell Offline' '/DAPP_DIR=LeaveBell-offline' '/DREG_KEY=Software\LeaveBell\offline' /DPKG_DIR="dist-offline\win-${{ matrix.arch }}" installer.nsi
+          & $nsis /V2 /DARCH=${{ matrix.arch }} /DVARIANT=screen /DSCREEN '/DAPP_TITLE=LeaveBell Screen' '/DAPP_DIR=LeaveBell-screen' '/DREG_KEY=Software\LeaveBell\screen' /DPKG_DIR="dist-native\screen-${{ matrix.arch }}" installer.nsi
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: win-${{ matrix.arch }}
           path: |
-            LeaveBell-Online-Setup-${{ matrix.arch }}.exe
-            LeaveBell-LocalVoice-Patch-${{ matrix.arch }}.exe
+            LeaveBell-online-windows-${{ matrix.arch }}.exe
+            LeaveBell-offline-windows-${{ matrix.arch }}.exe
+            LeaveBell-screen-windows-${{ matrix.arch }}.exe
           if-no-files-found: error
 
       - name: Upload Windows payload
@@ -74,10 +71,10 @@ jobs:
         with:
           name: win-payload-${{ matrix.arch }}
           path: |
-            dist-native/school-display-${{ matrix.arch }}/LeaveBell.exe
-            dist-native/school-display-${{ matrix.arch }}/LeaveBellDisplay.exe
+            dist-native/online-${{ matrix.arch }}/LeaveBell.exe
+            dist-native/online-${{ matrix.arch }}/LeaveBellDisplay.exe
+            dist-native/screen-${{ matrix.arch }}/LeaveBellDisplay.exe
             dist-offline/win-${{ matrix.arch }}/LeaveBell.exe
-            dist-offline/win-${{ matrix.arch }}/LeaveBellDisplay.exe
             dist-offline/win-${{ matrix.arch }}/sherpa-onnx-c-api.dll
             dist-offline/win-${{ matrix.arch }}/melo/models/sherpa-onnx-vits-zh-ll/model.onnx
           if-no-files-found: error
@@ -124,20 +121,21 @@ jobs:
         run: |
           bash build-linux.sh "${{ matrix.target }}" "${{ matrix.arch }}"
           bash build-offline.sh linux "${{ matrix.arch }}"
-          bash build-linux-packages.sh "${{ matrix.arch }}" offline
           bash build-linux-packages.sh "${{ matrix.arch }}" online
+          bash build-linux-packages.sh "${{ matrix.arch }}" offline
+          bash build-linux-packages.sh "${{ matrix.arch }}" screen
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}
           path: |
-            LeaveBell-Online-Linux-${{ matrix.arch }}.tar.gz
-            LeaveBell-Offline-Linux-${{ matrix.arch }}.tar.gz
-            LeaveBell-${{ matrix.arch }}.deb
-            LeaveBell-${{ matrix.arch }}.rpm
-            LeaveBell-Online-${{ matrix.arch }}.deb
-            LeaveBell-Online-${{ matrix.arch }}.rpm
+            LeaveBell-online-linux-${{ matrix.arch }}.deb
+            LeaveBell-online-linux-${{ matrix.arch }}.rpm
+            LeaveBell-offline-linux-${{ matrix.arch }}.deb
+            LeaveBell-offline-linux-${{ matrix.arch }}.rpm
+            LeaveBell-screen-linux-${{ matrix.arch }}.deb
+            LeaveBell-screen-linux-${{ matrix.arch }}.rpm
           if-no-files-found: error
 
   verify-linux:
@@ -156,68 +154,55 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y rpm libxkbcommon0 libwayland-client0 libx11-6 libasound2t64 || sudo apt-get install -y rpm libxkbcommon0 libwayland-client0 libx11-6 libasound2
 
-      - name: Verify Linux archives
-        shell: bash
-        run: |
-          set -euo pipefail
-          for arch in amd64 arm64; do
-            online_tar="artifacts/LeaveBell-Online-Linux-$arch.tar.gz"
-            offline_tar="artifacts/LeaveBell-Offline-Linux-$arch.tar.gz"
-            test -f "$online_tar"
-            test -f "$offline_tar"
-            rm -rf "online-$arch" "offline-$arch"
-            mkdir -p "online-$arch" "offline-$arch"
-            tar -xzf "$online_tar" -C "online-$arch"
-            tar -xzf "$offline_tar" -C "offline-$arch"
-            on="online-$arch/LeaveBell-$arch"
-            off="offline-$arch/linux-$arch"
-            test -x "$on/LeaveBell"
-            test -f "$on/LeaveBell.bin"
-            test -x "$on/LeaveBellDisplay"
-            test -f "$on/LeaveBellDisplay.bin"
-            test -x "$off/LeaveBell"
-            test -f "$off/LeaveBell.bin"
-            test -x "$off/LeaveBellDisplay"
-            test -f "$off/LeaveBellDisplay.bin"
-            test -f "$off/libsherpa-onnx-c-api.so"
-            test -f "$off/melo/models/sherpa-onnx-vits-zh-ll/model.onnx"
-            if [ "$arch" = "amd64" ]; then
-              (cd "$on" && timeout 30 ./LeaveBell --license-check)
-              grep -q '^registered=' "$on/license-tool-result.txt"
-              rm -f "$on/license-tool-result.txt"
-              (cd "$off" && timeout 30 ./LeaveBell --license-check)
-              grep -q '^registered=' "$off/license-tool-result.txt"
-              rm -f "$off/license-tool-result.txt"
-              if ldd "$on/LeaveBell.bin" | grep -q 'not found'; then echo "missing shared library in $on"; exit 1; fi
-              if ldd "$off/LeaveBell.bin" | grep -q 'not found'; then echo "missing shared library in $off"; exit 1; fi
-            else
-              file "$on/LeaveBell.bin" | grep -q 'aarch64'
-              file "$off/LeaveBell.bin" | grep -q 'aarch64'
-              file "$on/LeaveBellDisplay.bin" | grep -q 'aarch64'
-              file "$off/LeaveBellDisplay.bin" | grep -q 'aarch64'
-            fi
-          done
-
       - name: Verify Linux packages
         shell: bash
         run: |
           set -euo pipefail
-          for pkg in artifacts/LeaveBell-*.deb artifacts/LeaveBell-*.rpm; do
-            case "$pkg" in
-              *.deb) dpkg-deb -c "$pkg" >/dev/null; dpkg-deb -f "$pkg" Architecture | grep -q . ;;
-              *.rpm) rpm -qlp "$pkg" >/dev/null; rpm -qp --qf '%{ARCH}\n' "$pkg" | grep -q . ;;
+          for arch in amd64 arm64; do
+            case "$arch" in
+              amd64) deb_arch=amd64; rpm_arch=x86_64 ;;
+              arm64) deb_arch=arm64; rpm_arch=aarch64 ;;
             esac
-            case "$pkg" in
-              *.deb) list=$(dpkg-deb -c "$pkg") ;;
-              *.rpm) list=$(rpm -qlp "$pkg") ;;
-            esac
-            case "$pkg" in
-              *Online-*)
-                if echo "$list" | grep -q 'model.onnx'; then echo "online package contains offline model: $pkg"; exit 1; fi ;;
-              *)
-                echo "$list" | grep -q 'model.onnx'
-                echo "$list" | grep -q 'libsherpa-onnx-c-api.so' ;;
-            esac
+            for variant in online offline screen; do
+              deb="artifacts/LeaveBell-$variant-linux-$arch.deb"
+              rpm="artifacts/LeaveBell-$variant-linux-$arch.rpm"
+              test -f "$deb"
+              test -f "$rpm"
+              dpkg-deb -c "$deb" >/dev/null
+              test "$(dpkg-deb -f "$deb" Architecture)" = "$deb_arch"
+              rpm -qlp "$rpm" >/dev/null
+              test "$(rpm -qp --qf '%{ARCH}' "$rpm")" = "$rpm_arch"
+
+              case "$deb" in
+                *.deb) list=$(dpkg-deb -c "$deb") ;;
+              esac
+              case "$variant" in
+                online)
+                  echo "$list" | grep -q 'LeaveBell.bin'
+                  echo "$list" | grep -q 'LeaveBellDisplay.bin'
+                  if echo "$list" | grep -q 'model.onnx'; then echo "online contains model: $deb"; exit 1; fi ;;
+                offline)
+                  echo "$list" | grep -q 'LeaveBell.bin'
+                  echo "$list" | grep -q 'LeaveBellDisplay.bin'
+                  echo "$list" | grep -q 'model.onnx'
+                  echo "$list" | grep -q 'libsherpa-onnx-c-api.so' ;;
+                screen)
+                  echo "$list" | grep -q 'LeaveBellDisplay.bin'
+                  if echo "$list" | grep -q 'LeaveBell.bin'; then echo "screen contains controller: $deb"; exit 1; fi
+                  if echo "$list" | grep -q 'model.onnx'; then echo "screen contains model: $deb"; exit 1; fi ;;
+              esac
+
+              if [ "$arch" = "amd64" ] && [ "$variant" != "screen" ]; then
+                rm -rf "verify-$variant"
+                dpkg-deb -x "$deb" "verify-$variant"
+                exe=$(find "verify-$variant" -type f -name LeaveBell.bin | head -n 1)
+                dir=$(dirname "$exe")
+                (cd "$dir" && timeout 30 ./LeaveBell.bin --license-check)
+                test -f "$dir/license-tool-result.txt"
+                rm -f "$dir/license-tool-result.txt"
+                if ldd "$exe" | grep -q 'not found'; then echo "missing shared library: $exe"; exit 1; fi
+              fi
+            done
           done
 
   verify-win:
@@ -244,34 +229,33 @@ jobs:
             try { $b0 = $stream.ReadByte(); $b1 = $stream.ReadByte() } finally { $stream.Dispose() }
             if ($b0 -ne 0x4D -or $b1 -ne 0x5A) { throw "Not PE: $path" }
           }
-          foreach ($arch in @('amd64','arm64')) {
-            $setup = "artifacts/win-$arch/LeaveBell-Online-Setup-$arch.exe"
-            $patch = "artifacts/win-$arch/LeaveBell-LocalVoice-Patch-$arch.exe"
-            Assert-Pe $setup
-            Assert-Pe $patch
-            $payload = "artifacts/win-payload-$arch"
-            $onlineExe = "$payload/dist-native/school-display-$arch/LeaveBell.exe"
-            $displayExe = "$payload/dist-native/school-display-$arch/LeaveBellDisplay.exe"
-            $offlineExe = "$payload/dist-offline/win-$arch/LeaveBell.exe"
-            $dll = "$payload/dist-offline/win-$arch/sherpa-onnx-c-api.dll"
-            $model = "$payload/dist-offline/win-$arch/melo/models/sherpa-onnx-vits-zh-ll/model.onnx"
-            Assert-Pe $onlineExe
-            Assert-Pe $displayExe
-            Assert-Pe $offlineExe
-            Assert-File $dll
-            Assert-File $model
-            if ($arch -eq 'amd64') {
-              $exePath = (Resolve-Path $onlineExe).Path
-              $dir = Split-Path $exePath
-              $result = Join-Path $dir 'license-tool-result.txt'
-              Remove-Item $result -ErrorAction SilentlyContinue
-              $proc = Start-Process -FilePath $exePath -ArgumentList '--license-check' -WorkingDirectory $dir -Wait -PassThru -WindowStyle Hidden
-              if ($proc.ExitCode -ne 0) { throw "license-check failed: $onlineExe" }
-              if (-not (Test-Path $result)) { throw "missing result: $result" }
-              if ((Get-Content $result -Raw) -notmatch 'registered=') { throw "bad result: $result" }
-              Remove-Item $result -ErrorAction SilentlyContinue
-            }
+          $arch = 'amd64'
+          foreach ($variant in @('online','offline','screen')) {
+            Assert-Pe "artifacts/win-$arch/LeaveBell-$variant-windows-$arch.exe"
           }
+          $payload = "artifacts/win-payload-$arch"
+          $onlineExe = "$payload/dist-native/online-$arch/LeaveBell.exe"
+          $onlineDisplay = "$payload/dist-native/online-$arch/LeaveBellDisplay.exe"
+          $screenDisplay = "$payload/dist-native/screen-$arch/LeaveBellDisplay.exe"
+          $offlineExe = "$payload/dist-offline/win-$arch/LeaveBell.exe"
+          $dll = "$payload/dist-offline/win-$arch/sherpa-onnx-c-api.dll"
+          $model = "$payload/dist-offline/win-$arch/melo/models/sherpa-onnx-vits-zh-ll/model.onnx"
+          Assert-Pe $onlineExe
+          Assert-Pe $onlineDisplay
+          Assert-Pe $screenDisplay
+          Assert-Pe $offlineExe
+          Assert-File $dll
+          Assert-File $model
+
+          $exePath = (Resolve-Path $onlineExe).Path
+          $dir = Split-Path $exePath
+          $result = Join-Path $dir 'license-tool-result.txt'
+          Remove-Item $result -ErrorAction SilentlyContinue
+          $proc = Start-Process -FilePath $exePath -ArgumentList '--license-check' -WorkingDirectory $dir -Wait -PassThru -WindowStyle Hidden
+          if ($proc.ExitCode -ne 0) { throw "license-check failed: $onlineExe" }
+          if (-not (Test-Path $result)) { throw "missing result: $result" }
+          if ((Get-Content $result -Raw) -notmatch 'registered=') { throw "bad result: $result" }
+          Remove-Item $result -ErrorAction SilentlyContinue
 
   release:
     needs: [build-win, build-linux, verify-linux, verify-win]
@@ -287,10 +271,7 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/LeaveBell-Online-Setup-*.exe
-            release/LeaveBell-LocalVoice-Patch-*.exe
-            release/LeaveBell-Online-Linux-*.tar.gz
-            release/LeaveBell-Offline-Linux-*.tar.gz
-            release/LeaveBell-*.deb
-            release/LeaveBell-*.rpm
+            release/LeaveBell-*-windows-*.exe
+            release/LeaveBell-*-linux-*.deb
+            release/LeaveBell-*-linux-*.rpm
           generate_release_notes: true

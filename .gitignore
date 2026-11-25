@@ -12,9 +12,6 @@
 # 发布产物与运行数据
 *.exe
 *.dll
-LeaveBell-Linux-*.tar.gz
-LeaveBell-Online-Linux-*.tar.gz
-LeaveBell-Offline-Linux-*.tar.gz
 *.tar.bz2
 *.deb
 *.rpm
