@@ -51,7 +51,6 @@ pub struct SherpaOnnxOfflineTtsKittenModelConfig {
     pub tokens: *const c_char,
     pub data_dir: *const c_char,
     pub length_scale: f32,
-    pub lexicon: *const c_char,
 }
 
 #[repr(C)]
@@ -132,12 +131,6 @@ pub struct SherpaOnnxGenerationConfig {
     pub reference_text: *const c_char,
     pub num_steps: c_int,
     pub extra: *const c_char,
-    pub phoneme_codepoints: *const c_int,
-    pub phoneme_codepoints_lens: *const c_int,
-    pub phoneme_codepoints_num_sentences: c_int,
-    pub tokens: *const *const c_char,
-    pub tokens_lens: *const c_int,
-    pub tokens_num_sentences: c_int,
 }
 
 #[repr(C)]

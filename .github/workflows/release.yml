@@ -74,8 +74,8 @@ jobs:
           name: win-payload-${{ matrix.arch }}
           path: |
             dist-native/online-${{ matrix.arch }}/LeaveBell.exe
-            dist-native/online-${{ matrix.arch }}/LeaveBellDisplay.exe
-            dist-native/screen-${{ matrix.arch }}/LeaveBellDisplay.exe
+            dist-native/online-${{ matrix.arch }}/LeaveBellScreen.exe
+            dist-native/screen-${{ matrix.arch }}/LeaveBellScreen.exe
             dist-offline/win-${{ matrix.arch }}/LeaveBell.exe
             dist-offline/win-${{ matrix.arch }}/sherpa-onnx-c-api.dll
             dist-offline/win-${{ matrix.arch }}/melo/models/sherpa-onnx-vits-zh-ll/model.onnx
@@ -181,15 +181,15 @@ jobs:
               case "$variant" in
                 online)
                   echo "$list" | grep -q 'LeaveBell.bin'
-                  echo "$list" | grep -q 'LeaveBellDisplay.bin'
+                  echo "$list" | grep -q 'LeaveBellScreen.bin'
                   if echo "$list" | grep -q 'model.onnx'; then echo "online contains model: $deb"; exit 1; fi ;;
                 offline)
                   echo "$list" | grep -q 'LeaveBell.bin'
-                  echo "$list" | grep -q 'LeaveBellDisplay.bin'
+                  echo "$list" | grep -q 'LeaveBellScreen.bin'
                   echo "$list" | grep -q 'model.onnx'
                   echo "$list" | grep -q 'libsherpa-onnx-c-api.so' ;;
                 screen)
-                  echo "$list" | grep -q 'LeaveBellDisplay.bin'
+                  echo "$list" | grep -q 'LeaveBellScreen.bin'
                   if echo "$list" | grep -q 'LeaveBell.bin'; then echo "screen contains controller: $deb"; exit 1; fi
                   if echo "$list" | grep -q 'model.onnx'; then echo "screen contains model: $deb"; exit 1; fi ;;
               esac
@@ -237,8 +237,8 @@ jobs:
           }
           $payload = "artifacts/win-payload-$arch"
           $onlineExe = "$payload/dist-native/online-$arch/LeaveBell.exe"
-          $onlineDisplay = "$payload/dist-native/online-$arch/LeaveBellDisplay.exe"
-          $screenDisplay = "$payload/dist-native/screen-$arch/LeaveBellDisplay.exe"
+          $onlineDisplay = "$payload/dist-native/online-$arch/LeaveBellScreen.exe"
+          $screenDisplay = "$payload/dist-native/screen-$arch/LeaveBellScreen.exe"
           $offlineExe = "$payload/dist-offline/win-$arch/LeaveBell.exe"
           $dll = "$payload/dist-offline/win-$arch/sherpa-onnx-c-api.dll"
           $model = "$payload/dist-offline/win-$arch/melo/models/sherpa-onnx-vits-zh-ll/model.onnx"

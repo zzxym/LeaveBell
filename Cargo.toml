@@ -8,7 +8,7 @@ name = "LeaveBell"
 path = "src/main.rs"
 
 [[bin]]
-name = "LeaveBellDisplay"
+name = "LeaveBellScreen"
 path = "src/display_main.rs"
 
 [dependencies]
@@ -22,6 +22,9 @@ tiny_http = "0.12"
 # JSON 与序列化
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# TLS：ureq 同时带入 ring/aws-lc-rs，需显式选定 crypto provider
+rustls = "0.23"
 
 # edge-tts（在线语音，基础版默认引擎，同步 blocking 模式）
 msedge-tts = "0.4"

@@ -11,7 +11,7 @@ cargo "${build_args[@]}"
 
 bin="target/${TARGET:+$TARGET/}release/LeaveBell"
 [ -f "$bin" ] || bin="target/release/LeaveBell"
-screen_bin="$(dirname "$bin")/LeaveBellDisplay"
+screen_bin="$(dirname "$bin")/LeaveBellScreen"
 
 online="dist-linux/online-$ARCH"
 screen="dist-linux/screen-$ARCH"
@@ -22,8 +22,8 @@ done
 mkdir -p "$online/web" "$online/data"
 
 cp "$bin" "$online/LeaveBell.bin"
-cp "$screen_bin" "$online/LeaveBellDisplay.bin"
-cp "$screen_bin" "$screen/LeaveBellDisplay.bin"
+cp "$screen_bin" "$online/LeaveBellScreen.bin"
+cp "$screen_bin" "$screen/LeaveBellScreen.bin"
 cp "assets/OFL-Noto-CJK.txt" "$online/OFL-Noto-CJK.txt"
 cp "assets/OFL-Noto-CJK.txt" "$screen/OFL-Noto-CJK.txt"
 cat > "$online/LeaveBell" <<'EOF'
@@ -32,13 +32,17 @@ DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 export LD_LIBRARY_PATH="$DIR:${LD_LIBRARY_PATH:-}"
 exec "$DIR/LeaveBell.bin" "$@"
 EOF
-cat > "$online/LeaveBellDisplay" <<'EOF'
+cat > "$online/LeaveBellScreen" <<'EOF'
 #!/usr/bin/env bash
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-exec "$DIR/LeaveBellDisplay.bin" "$@"
+exec "$DIR/LeaveBellScreen.bin" "$@"
 EOF
-cp "$online/LeaveBellDisplay" "$screen/LeaveBellDisplay"
-chmod +x "$online/LeaveBell" "$online/LeaveBellDisplay" "$screen/LeaveBellDisplay"
+cat > "$screen/LeaveBellScreen" <<'EOF'
+#!/usr/bin/env bash
+DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+exec "$DIR/LeaveBellScreen.bin" "$@"
+EOF
+chmod +x "$online/LeaveBell" "$online/LeaveBellScreen" "$screen/LeaveBellScreen"
 
 cp -r web/. "$online/web/"
 cp preset/data.json "$online/data/data.json"

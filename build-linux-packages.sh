@@ -19,7 +19,7 @@ case "$VARIANT" in
     OPT="LeaveBell-offline"; MAIN="LeaveBell"; LINK="LeaveBell-offline"; DESKTOP="LeaveBellOffline"; TITLE="LeaveBell Offline" ;;
   screen)
     SRC="dist-linux/screen-$ARCH"; PKG="leavebell-screen"; OUT="LeaveBell-screen-linux-$ARCH"
-    OPT="LeaveBell-screen"; MAIN="LeaveBellDisplay"; LINK="LeaveBellScreen"; DESKTOP="LeaveBellScreen"; TITLE="LeaveBell Screen" ;;
+    OPT="LeaveBell-screen"; MAIN="LeaveBellScreen"; LINK="LeaveBellScreen"; DESKTOP="LeaveBellScreen"; TITLE="LeaveBell Screen" ;;
   *) echo "未知版本: $VARIANT"; exit 1 ;;
 esac
 [ -d "$SRC" ] || { echo "缺少包源: $SRC"; exit 1; }

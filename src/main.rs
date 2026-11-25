@@ -21,6 +21,8 @@ fn exe_dir() -> PathBuf {
 }
 
 fn main() -> eframe::Result {
+    // ureq 同时启用 ring/aws-lc-rs，必须显式选定 provider，否则首次 TLS 连接会 panic。
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let base = exe_dir();
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--license-keygen") {

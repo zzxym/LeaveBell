@@ -72,11 +72,11 @@ Section "Install"
 
   CreateDirectory "$SMPROGRAMS\${APP_TITLE}"
   !ifdef SCREEN
-    CreateShortcut "$SMPROGRAMS\${APP_TITLE}\大屏端.lnk" "$INSTDIR\LeaveBellDisplay.exe"
-    CreateShortcut "$DESKTOP\${APP_TITLE}.lnk" "$INSTDIR\LeaveBellDisplay.exe"
+    CreateShortcut "$SMPROGRAMS\${APP_TITLE}\大屏端.lnk" "$INSTDIR\LeaveBellScreen.exe"
+    CreateShortcut "$DESKTOP\${APP_TITLE}.lnk" "$INSTDIR\LeaveBellScreen.exe"
   !else
     CreateShortcut "$SMPROGRAMS\${APP_TITLE}\${APP_TITLE}.lnk" "$INSTDIR\LeaveBell.exe"
-    CreateShortcut "$SMPROGRAMS\${APP_TITLE}\大屏端.lnk" "$INSTDIR\LeaveBellDisplay.exe"
+    CreateShortcut "$SMPROGRAMS\${APP_TITLE}\大屏端.lnk" "$INSTDIR\LeaveBellScreen.exe"
     CreateShortcut "$DESKTOP\${APP_TITLE}.lnk" "$INSTDIR\LeaveBell.exe"
   !endif
   CreateShortcut "$SMPROGRAMS\${APP_TITLE}\卸载.lnk" "$INSTDIR\uninstall.exe"
@@ -85,10 +85,10 @@ SectionEnd
 Section "Uninstall"
   Delete "$INSTDIR\uninstall.exe"
   !ifdef SCREEN
-    Delete "$INSTDIR\LeaveBellDisplay.exe"
+    Delete "$INSTDIR\LeaveBellScreen.exe"
   !else
     Delete "$INSTDIR\LeaveBell.exe"
-    Delete "$INSTDIR\LeaveBellDisplay.exe"
+    Delete "$INSTDIR\LeaveBellScreen.exe"
     RMDir /r "$INSTDIR\web"
     RMDir /r "$INSTDIR\data"
     RMDir /r "$INSTDIR\melo"

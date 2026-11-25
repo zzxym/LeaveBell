@@ -117,7 +117,7 @@ impl VoiceEngine {
         if !model.is_file() {
             return vec![];
         }
-        // sherpa-onnx VITS（MeloTTS）：仅保留两个说话人，显示为女声/男声（前端映射）
+        // sherpa-onnx VITS（MeloTTS）：保留用户已选用的两个音色编号（前端映射为女声/男声）
         vec![
             "sherpa-onnx-vits-zh-ll/2".into(),
             "sherpa-onnx-vits-zh-ll/3".into(),

@@ -16,7 +16,8 @@ use serde_json::Value;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::sync::Mutex;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Serialize, Deserialize)]
 struct DisplayConfig {
@@ -65,6 +66,48 @@ fn fetch_json(url: &str) -> Option<Value> {
     ureq::get(url).timeout(Duration::from_secs(3)).call().ok()?.into_json().ok()
 }
 
+#[derive(Clone)]
+struct FetchSettings {
+    base: String,
+}
+
+struct DisplaySnapshot {
+    base: String,
+    classes: Option<Vec<Value>>,
+    display: Option<Value>,
+    labels: Option<Vec<String>>,
+    voice: Option<(String, String, String)>,
+}
+
+fn start_fetcher(settings: Arc<Mutex<FetchSettings>>, latest: Arc<Mutex<Option<DisplaySnapshot>>>) {
+    std::thread::spawn(move || loop {
+        let s = settings.lock().unwrap().clone();
+        let mut classes = None;
+        let mut display = None;
+        let mut labels = None;
+        let mut voice = None;
+        if let Some(v) = fetch_json(&format!("{}/api/classes", s.base)) {
+            classes = v["data"].as_array().cloned();
+        }
+        if let Some(v) = fetch_json(&format!("{}/api/display", s.base)) {
+            let d = v["data"].clone();
+            labels = d["statusLabels"].as_array()
+                .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect());
+            display = Some(d);
+        }
+        if let Some(v) = fetch_json(&format!("{}/api/voice/current", s.base)) {
+            let d = &v["data"];
+            voice = Some((
+                d["id"].as_str().unwrap_or("").to_string(),
+                d["class_id"].as_str().unwrap_or("").to_string(),
+                d["audio"].as_str().unwrap_or("").to_string(),
+            ));
+        }
+        *latest.lock().unwrap() = Some(DisplaySnapshot { base: s.base, classes, display, labels, voice });
+        std::thread::sleep(Duration::from_millis(500));
+    });
+}
+
 fn fetch_audio(url: &str) -> Option<(Vec<u8>, bool)> {
     let res = ureq::get(url).timeout(Duration::from_secs(5)).call().ok()?;
     let mime = res.header("Content-Type").unwrap_or("").to_string();
@@ -100,7 +143,6 @@ struct DisplayApp {
     classes: Vec<Value>,
     display: Value,
     labels: Vec<String>,
-    last_fetch: Instant,
     last_audio: String,
     speaking: String,
     settings_open: bool,
@@ -108,11 +150,16 @@ struct DisplayApp {
     voice_input: bool,
     msg: String,
     fullscreen_set: bool,
+    fetch_settings: Arc<Mutex<FetchSettings>>,
+    latest: Arc<Mutex<Option<DisplaySnapshot>>>,
 }
 
 impl DisplayApp {
     fn new(cfg: DisplayConfig, cfg_path: PathBuf) -> Self {
         let base = normalize_base(&cfg.controller);
+        let fetch_settings = Arc::new(Mutex::new(FetchSettings { base: base.clone() }));
+        let latest = Arc::new(Mutex::new(None));
+        start_fetcher(fetch_settings.clone(), latest.clone());
         Self {
             controller_input: cfg.controller.clone(),
             voice_input: cfg.voice,
@@ -123,39 +170,30 @@ impl DisplayApp {
             classes: Vec::new(),
             display: Value::Null,
             labels: Vec::new(),
-            last_fetch: Instant::now() - Duration::from_secs(10),
             last_audio: String::new(),
             speaking: String::new(),
             settings_open: false,
             msg: String::new(),
             fullscreen_set: false,
+            fetch_settings,
+            latest,
         }
     }
 
     fn refresh(&mut self) {
-        if self.last_fetch.elapsed() < Duration::from_secs(1) { return; }
-        self.last_fetch = Instant::now();
-
-        let classes_url = format!("{}/api/classes", self.base);
-        let display_url = format!("{}/api/display", self.base);
-        let voice_url = format!("{}/api/voice/current", self.base);
-
-        if let Some(v) = fetch_json(&classes_url) {
-            if let Some(arr) = v["data"].as_array() { self.classes = arr.clone(); }
-        }
-        if let Some(v) = fetch_json(&display_url) {
-            self.display = v["data"].clone();
-            self.labels = self.display["statusLabels"].as_array()
-                .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
-                .unwrap_or_default();
-        }
-        if let Some(v) = fetch_json(&voice_url) {
-            let d = &v["data"];
-            let id = d["id"].as_str().unwrap_or("").to_string();
+        let snapshot = match self.latest.lock().unwrap().take() {
+            Some(s) => s,
+            None => return,
+        };
+        if snapshot.base != self.base { return; }
+        if let Some(classes) = snapshot.classes { self.classes = classes; }
+        if let Some(display) = snapshot.display { self.display = display; }
+        if let Some(labels) = snapshot.labels { self.labels = labels; }
+        if let Some((id, class_id, audio)) = snapshot.voice {
             if self.cfg.voice && !id.is_empty() && id != self.last_audio {
                 self.last_audio = id;
-                self.speaking = d["class_id"].as_str().unwrap_or("").to_string();
-                if let Some(audio) = d["audio"].as_str() { play_audio(&self.base, audio); }
+                self.speaking = class_id;
+                if !audio.is_empty() { play_audio(&self.base, &audio); }
             }
         }
     }
@@ -165,8 +203,8 @@ impl DisplayApp {
         self.cfg.voice = self.voice_input;
         self.base = self.cfg.controller.clone();
         self.cfg.save(&self.cfg_path);
+        *self.fetch_settings.lock().unwrap() = FetchSettings { base: self.base.clone() };
         self.last_audio.clear();
-        self.last_fetch = Instant::now() - Duration::from_secs(10);
         self.msg = "已保存".into();
     }
 }
@@ -183,8 +221,17 @@ impl eframe::App for DisplayApp {
         self.refresh();
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            let speaking = if self.speaking.is_empty() { None } else { Some(self.speaking.as_str()) };
-            draw_display_grid_for_client(ui, &self.classes, &self.display, &self.labels, &self.screens, speaking);
+            if self.classes.is_empty() {
+                ui.centered_and_justified(|ui| {
+                    ui.vertical(|ui| {
+                        ui.heading("未连接到控制器");
+                        ui.label(format!("当前地址：{}　按 F2 打开设置修改", self.cfg.controller));
+                    });
+                });
+            } else {
+                let speaking = if self.speaking.is_empty() { None } else { Some(self.speaking.as_str()) };
+                draw_display_grid_for_client(ui, &self.classes, &self.display, &self.labels, &self.screens, speaking);
+            }
         });
 
         let mut open = self.settings_open;
@@ -207,6 +254,7 @@ impl eframe::App for DisplayApp {
 fn main() -> eframe::Result {
     let base = exe_dir();
     let cfg_path = model::state_dir(&base).join("display-config.json");
+    let first_run = !cfg_path.is_file();
     let cfg = DisplayConfig::load(&cfg_path);
     let icon = Arc::new(
         eframe::icon_data::from_png_bytes(include_bytes!("../assets/app-icon.png"))
@@ -222,7 +270,11 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "LeaveBell 大屏端",
         options,
-        Box::new(move |_| Ok(Box::new(DisplayApp::new(cfg, cfg_path)))),
+        Box::new(move |_| {
+            let mut app = DisplayApp::new(cfg, cfg_path);
+            if first_run { app.settings_open = true; }
+            Ok(Box::new(app))
+        }),
     )
 }
 

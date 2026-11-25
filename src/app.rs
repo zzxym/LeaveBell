@@ -562,6 +562,20 @@ fn render_software_settings(
                 ui.add(egui::TextEdit::singleline(&mut s.port).desired_width(120.0));
             });
             ui.separator();
+            let mut voice_enabled = {
+                let db = store.lock().unwrap();
+                db.data["voice"]["enabled"].as_bool().unwrap_or(true)
+            };
+            if ui.checkbox(&mut voice_enabled, "大屏语音播报").clicked() {
+                let updated = {
+                    let mut db = store.lock().unwrap();
+                    db.data["voice"]["enabled"] = serde_json::json!(voice_enabled);
+                    db.persist();
+                    db.data["voice"].clone()
+                };
+                crate::voice::update_settings(updated);
+            }
+            ui.separator();
             ui.label("重设管理密码（留空表示不修改）：");
             ui.horizontal(|ui| {
                 ui.label("新密码：");
@@ -1074,6 +1088,11 @@ impl eframe::App for App {
                     .with_inner_size([800.0, 600.0]).with_icon(icon),
                 move |ctx, _class| {
                     ctx.request_repaint_after(std::time::Duration::from_millis(33));
+                    if ctx.input(|i| i.key_pressed(egui::Key::F2)) {
+                        let mut s = settings.lock().unwrap();
+                        s.open = true;
+                        s.on_main = false;
+                    }
                     let cfg_guard = cfg.lock().unwrap();
                     if let Some(sid) = cfg_guard.display_screen() {
                         if let Some(s) = screens.iter().find(|s| &s.id == sid) {
@@ -1117,6 +1136,8 @@ impl eframe::App for App {
                 ViewportId::from_hash_of(DISPLAY_VIEWPORT),
                 ViewportCommand::Close,
             );
+            // viewport 重建后需要重新下发定位/全屏命令
+            self.display_applied.lock().unwrap().clear();
         }
     }
 }

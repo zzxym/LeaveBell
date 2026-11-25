@@ -38,7 +38,7 @@ cargo build --release
 cargo run --release
 ```
 
-`LeaveBell` 是控制器，`LeaveBellDisplay` 是独立大屏端。大屏端按 `F2` 打开设置，填写控制器地址，并可开关语音播放（默认开启）。
+`LeaveBell` 是控制器，`LeaveBellScreen` 是大屏端；online/offline 包内附带的也是同一个 `LeaveBellScreen`。大屏端按 `F2` 打开设置，填写控制器地址，并可开关语音播放（默认开启）。首次运行会自动弹出设置窗口。
 
 ## 持久化数据
 
