@@ -224,22 +224,13 @@ fn hex_color(s: &str, default: Color32) -> Color32 {
 }
 
 fn setup_chinese_font(ctx: &Context) {
-    let candidates = [
-        r"C:\Windows\Fonts\msyh.ttc",
-        r"C:\Windows\Fonts\msyhbd.ttc",
-        r"C:\Windows\Fonts\simhei.ttf",
-        r"C:\Windows\Fonts\simsun.ttc",
-    ];
-    let path = candidates.iter().find(|p| std::path::Path::new(p).exists());
-    if let Some(path) = path {
-        if let Ok(bytes) = std::fs::read(path) {
-            let mut fonts = egui::FontDefinitions::default();
-            fonts.font_data.insert("chinese".to_owned(), egui::FontData::from_owned(bytes).into());
-            fonts.families.get_mut(&egui::FontFamily::Proportional).unwrap().insert(0, "chinese".to_owned());
-            fonts.families.get_mut(&egui::FontFamily::Monospace).unwrap().push("chinese".to_owned());
-            ctx.set_fonts(fonts);
-        }
-    }
+    // Noto Sans SC (SIL OFL 1.1) is embedded so Linux systems need no CJK fonts installed.
+    let bytes = include_bytes!("../assets/NotoSansSC-Regular.otf").to_vec();
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert("chinese".to_owned(), egui::FontData::from_owned(bytes).into());
+    fonts.families.get_mut(&egui::FontFamily::Proportional).unwrap().insert(0, "chinese".to_owned());
+    fonts.families.get_mut(&egui::FontFamily::Monospace).unwrap().insert(0, "chinese".to_owned());
+    ctx.set_fonts(fonts);
 }
 /// 画顺时针跑马灯虚线边框：沿矩形周长按时间偏移绘制亮段
 fn draw_voice_border(painter: &egui::Painter, rect: egui::Rect, time: f32, radius: f32) {

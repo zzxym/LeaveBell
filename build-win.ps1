@@ -41,6 +41,7 @@ if (Test-Path $presetData) {
 Write-Host "== 2/3 Copying files =="
 Copy-Item $release (Join-Path $out "$exeName.exe")
 Copy-Item $displayRelease (Join-Path $out "LeaveBellDisplay.exe")
+Copy-Item (Join-Path $root "assets\OFL-Noto-CJK.txt") (Join-Path $out "OFL-Noto-CJK.txt")
 Copy-Item (Join-Path $root "web\*") (Join-Path $out "web") -Recurse -Force
 
 Write-Host "== 3/3 Done =="
