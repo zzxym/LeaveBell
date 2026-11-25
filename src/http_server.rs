@@ -348,6 +348,20 @@ fn handle_get(
                 let url_header = Header::from_bytes(&b"X-Scan-Url"[..], url.as_bytes()).unwrap();
                 let _ = req.respond(Response::from_data(svg.as_bytes().to_vec()).with_header(ct).with_header(url_header));
             }
+            "/api/voice/current" => {
+                json_response(req, json!({"ok": true, "data": crate::voice::current_audio()}), 200);
+            }
+            "/api/voice/audio" => {
+                let id = extract_query(req.url(), "id");
+                match crate::voice::audio_by_id(&id) {
+                    Some((data, mime)) => {
+                        let ct = Header::from_bytes(&b"Content-Type"[..], mime.as_bytes()).unwrap();
+                        let cc = Header::from_bytes(&b"Cache-Control"[..], &b"public, max-age=600"[..]).unwrap();
+                        let _ = req.respond(Response::from_data(data).with_header(ct).with_header(cc));
+                    }
+                    None => not_found(req),
+                }
+            }
             _ => serve_static(req, path, &webdir),
     }
     Ok(())

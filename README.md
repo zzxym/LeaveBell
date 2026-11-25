@@ -8,8 +8,10 @@
 
 | 版本 | 安装包 | 语音引擎 |
 | --- | --- | --- |
-| 在线语音精简版 | `LeaveBell-Online-Setup-1.0.0.exe` | EdgeTTS（在线，Rust 原生 `msedge-tts`） |
-| 本地语音包补丁 | `LeaveBell-LocalVoice-Patch-1.0.0.exe` | EdgeTTS（在线）+ MeloTTS（离线，sherpa-onnx VITS，需先装精简版） |
+| 在线语音精简版 | `LeaveBell-Online-Setup-<架构>.exe` | EdgeTTS（在线，Rust 原生 `msedge-tts`） |
+| 本地语音包补丁 | `LeaveBell-LocalVoice-Patch-<架构>.exe` | EdgeTTS（在线）+ MeloTTS（离线，sherpa-onnx VITS，需先装精简版） |
+
+`v2.0.0` 起安装包内含 `LeaveBellDisplay` 独立大屏端；控制器合成音频，大屏端/网页大屏负责播放。控制器可同时服务多个大屏。
 
 本地语音包补丁在精简版基础上叠加，不单独运行；安装后可在管理端切换语音引擎。离线音色使用模型说话人 2 / 3，界面显示为「女声」「男声」。
 

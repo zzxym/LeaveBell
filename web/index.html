@@ -395,10 +395,18 @@ fetchData();
 // 由管理端状态变化推送驱动刷新，不再定时轮询。
 // update：班级状态等数据变化，只拉数据；display：布局/样式变化，重新拉设置与数据。
 const events = new EventSource("/api/events");
+let lastVoiceAudio = "";
 events.addEventListener("update", () => fetchData());
 events.addEventListener("display", () => { fetchDisplay(); fetchData(); });
 events.addEventListener("voice_start", (e) => {
-  try { speakingCid = (JSON.parse(e.data || "{}").class_id) || ""; } catch (_) { speakingCid = ""; }
+  try {
+    const d = JSON.parse(e.data || "{}");
+    speakingCid = d.class_id || "";
+    if (d.audio && d.audio !== lastVoiceAudio) {
+      lastVoiceAudio = d.audio;
+      new Audio(d.audio).play().catch(() => {});
+    }
+  } catch (_) { speakingCid = ""; }
   renderCards();
 });
 events.addEventListener("voice_end", () => { speakingCid = ""; renderCards(); });

@@ -2,7 +2,7 @@
 ; 用法: makensis installer.nsi  (需安装 NSIS 3.x)
 
 !define APP_NAME "LeaveBell"
-!define APP_VERSION "1.0.0"
+!define APP_VERSION "2.0.0"
 !define APP_EXE "LeaveBell.exe"
 !define APP_PUBLISHER "School"
 !define INSTALL_DIR "D:\LeaveBell"
@@ -32,6 +32,7 @@ Section "Install"
   SetOutPath "$INSTDIR"
   ; 主程序
   File "${PKG_DIR}\${APP_EXE}"
+  File "${PKG_DIR}\LeaveBellDisplay.exe"
   ; 基础版只含 web / data（语音使用在线 edge-tts，无需本地运行时）
   File /r "${PKG_DIR}\web"
   File /r "${PKG_DIR}\data"
@@ -50,6 +51,7 @@ Section "Install"
   ; 开始菜单 / 桌面快捷方式
   CreateDirectory "$SMPROGRAMS\${APP_NAME}"
   CreateShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}"
+  CreateShortcut "$SMPROGRAMS\${APP_NAME}\大屏端.lnk" "$INSTDIR\LeaveBellDisplay.exe"
   CreateShortcut "$SMPROGRAMS\${APP_NAME}\卸载.lnk" "$INSTDIR\uninstall.exe"
   CreateShortcut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}"
 SectionEnd
@@ -57,6 +59,7 @@ SectionEnd
 ; ---- 卸载 ----
 Section "Uninstall"
   Delete "$INSTDIR\${APP_EXE}"
+  Delete "$INSTDIR\LeaveBellDisplay.exe"
   Delete "$INSTDIR\uninstall.exe"
   RMDir /r "$INSTDIR\web"
   RMDir /r "$INSTDIR\data"
@@ -66,6 +69,7 @@ Section "Uninstall"
   RMDir "$INSTDIR"
 
   Delete "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk"
+  Delete "$SMPROGRAMS\${APP_NAME}\大屏端.lnk"
   Delete "$SMPROGRAMS\${APP_NAME}\卸载.lnk"
   RMDir "$SMPROGRAMS\${APP_NAME}"
   Delete "$DESKTOP\${APP_NAME}.lnk"

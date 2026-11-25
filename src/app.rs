@@ -463,6 +463,21 @@ fn draw_display_grid(
     }
 }
 
+#[allow(dead_code)]
+pub(crate) fn draw_display_grid_for_client(
+    ui: &mut egui::Ui,
+    classes: &[Value],
+    display: &Value,
+    status_labels: &[String],
+    screens: &[ScreenInfo],
+    speaking: Option<&str>,
+) {
+    let cfg = Arc::new(Mutex::new(ScreenConfig::load(std::path::PathBuf::new())));
+    let menu = Arc::new(Mutex::new(false));
+    let settings = Arc::new(Mutex::new(SoftwareSettings::default()));
+    draw_display_grid(ui, classes, display, status_labels, screens, &cfg, &menu, &settings, speaking);
+}
+
 #[derive(Default)]
 struct SoftwareSettings {
     open: bool,
@@ -715,6 +730,15 @@ impl App {
                     ui.label(format!("试用剩余 {:02}:{:02}", remaining / 60, remaining % 60));
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let mut local_display = {
+                        let db = self.store.lock().unwrap();
+                        db.data["localDisplayEnabled"].as_bool().unwrap_or(true)
+                    };
+                    if ui.checkbox(&mut local_display, "本地大屏").clicked() {
+                        let mut db = self.store.lock().unwrap();
+                        db.data["localDisplayEnabled"] = Value::Bool(local_display);
+                        db.persist();
+                    }
                     if ui.button("设置").clicked() {
                         let mut s = settings.lock().unwrap();
                         s.open = true;
@@ -1044,7 +1068,8 @@ impl eframe::App for App {
         }
         // 端口错误/设置密码/选屏阶段不创建大屏窗口，避免全屏大屏遮挡控制器弹窗
         let port_ok = self.port_state.lock().unwrap().1.is_none();
-        if port_ok && !self.picker_open && !self.pwd_setup_open {
+        let local_display = self.store.lock().unwrap().data["localDisplayEnabled"].as_bool().unwrap_or(true);
+        if port_ok && !self.picker_open && !self.pwd_setup_open && local_display {
             let store = self.store.clone();
             let screens = self.screens.clone();
             let cfg = self.screen_cfg.clone();
@@ -1095,6 +1120,11 @@ impl eframe::App for App {
                         render_software_settings(ctx, &settings, &store);
                     }
                 },
+            );
+        } else if !local_display {
+            ctx.send_viewport_cmd_to(
+                ViewportId::from_hash_of(DISPLAY_VIEWPORT),
+                ViewportCommand::Close,
             );
         }
     }

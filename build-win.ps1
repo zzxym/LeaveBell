@@ -20,6 +20,8 @@ $release = "E:\rust-target\release\$exeName.exe"
 if ($Target) { $release = "$PSScriptRoot\target\$Target\release\$exeName.exe" }
 if (-not (Test-Path $release)) { $release = "$PSScriptRoot\target\release\$exeName.exe" }
 if (-not (Test-Path $release)) { Write-Error "Release exe not found"; exit 1 }
+$displayRelease = Join-Path (Split-Path $release) "LeaveBellDisplay.exe"
+if (-not (Test-Path $displayRelease)) { Write-Error "Display exe not found"; exit 1 }
 
 $out = Join-Path $PSScriptRoot "dist-native\school-display-$Arch"
 # 基础版只含 edge-tts（在线），不打包 piper；它由本地语音包补丁提供
@@ -38,6 +40,7 @@ if (Test-Path $presetData) {
 
 Write-Host "== 2/3 Copying files =="
 Copy-Item $release (Join-Path $out "$exeName.exe")
+Copy-Item $displayRelease (Join-Path $out "LeaveBellDisplay.exe")
 Copy-Item (Join-Path $root "web\*") (Join-Path $out "web") -Recurse -Force
 
 Write-Host "== 3/3 Done =="

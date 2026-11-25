@@ -7,6 +7,10 @@ edition = "2021"
 name = "LeaveBell"
 path = "src/main.rs"
 
+[[bin]]
+name = "LeaveBellDisplay"
+path = "src/display_main.rs"
+
 [dependencies]
 # GUI
 eframe = "0.31"
@@ -35,6 +39,7 @@ qrcodegen = "1.8"
 ring = "0.17"
 base64 = "0.23"
 libloading = "0.8"
+ureq = { version = "2", features = ["json"] }
 
 # Windows API（显示器枚举、网卡枚举）
 [target.'cfg(windows)'.dependencies]

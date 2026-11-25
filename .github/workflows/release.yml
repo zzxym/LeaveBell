@@ -75,7 +75,9 @@ jobs:
           name: win-payload-${{ matrix.arch }}
           path: |
             dist-native/school-display-${{ matrix.arch }}/LeaveBell.exe
+            dist-native/school-display-${{ matrix.arch }}/LeaveBellDisplay.exe
             dist-offline/win-${{ matrix.arch }}/LeaveBell.exe
+            dist-offline/win-${{ matrix.arch }}/LeaveBellDisplay.exe
             dist-offline/win-${{ matrix.arch }}/sherpa-onnx-c-api.dll
             dist-offline/win-${{ matrix.arch }}/melo/models/sherpa-onnx-vits-zh-ll/model.onnx
           if-no-files-found: error
@@ -171,8 +173,12 @@ jobs:
             off="offline-$arch/linux-$arch"
             test -x "$on/LeaveBell"
             test -f "$on/LeaveBell.bin"
+            test -x "$on/LeaveBellDisplay"
+            test -f "$on/LeaveBellDisplay.bin"
             test -x "$off/LeaveBell"
             test -f "$off/LeaveBell.bin"
+            test -x "$off/LeaveBellDisplay"
+            test -f "$off/LeaveBellDisplay.bin"
             test -f "$off/libsherpa-onnx-c-api.so"
             test -f "$off/melo/models/sherpa-onnx-vits-zh-ll/model.onnx"
             if [ "$arch" = "amd64" ]; then
@@ -187,6 +193,8 @@ jobs:
             else
               file "$on/LeaveBell.bin" | grep -q 'aarch64'
               file "$off/LeaveBell.bin" | grep -q 'aarch64'
+              file "$on/LeaveBellDisplay.bin" | grep -q 'aarch64'
+              file "$off/LeaveBellDisplay.bin" | grep -q 'aarch64'
             fi
           done
 
@@ -243,10 +251,12 @@ jobs:
             Assert-Pe $patch
             $payload = "artifacts/win-payload-$arch"
             $onlineExe = "$payload/dist-native/school-display-$arch/LeaveBell.exe"
+            $displayExe = "$payload/dist-native/school-display-$arch/LeaveBellDisplay.exe"
             $offlineExe = "$payload/dist-offline/win-$arch/LeaveBell.exe"
             $dll = "$payload/dist-offline/win-$arch/sherpa-onnx-c-api.dll"
             $model = "$payload/dist-offline/win-$arch/melo/models/sherpa-onnx-vits-zh-ll/model.onnx"
             Assert-Pe $onlineExe
+            Assert-Pe $displayExe
             Assert-Pe $offlineExe
             Assert-File $dll
             Assert-File $model

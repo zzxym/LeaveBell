@@ -4,10 +4,10 @@ cd "$(dirname "$0")"
 
 ARCH="$1"
 VARIANT="${2:-offline}"
-REF="${GITHUB_REF_NAME:-v1.0.0}"
+REF="${GITHUB_REF_NAME:-v2.0.0}"
 case "$REF" in
   v*) VER="${REF#v}" ;;
-  *) VER="1.0.0" ;;
+  *) VER="2.0.0" ;;
 esac
 
 case "$VARIANT" in

@@ -17,13 +17,19 @@ rm -rf "$out"
 mkdir -p "$out/web" "$out/data"
 
 cp "$bin" "$out/LeaveBell.bin"
+cp "$(dirname "$bin")/LeaveBellDisplay" "$out/LeaveBellDisplay.bin"
 cat > "$out/LeaveBell" <<'EOF'
 #!/usr/bin/env bash
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 export LD_LIBRARY_PATH="$DIR:${LD_LIBRARY_PATH:-}"
 exec "$DIR/LeaveBell.bin" "$@"
 EOF
-chmod +x "$out/LeaveBell"
+cat > "$out/LeaveBellDisplay" <<'EOF'
+#!/usr/bin/env bash
+DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+exec "$DIR/LeaveBellDisplay.bin" "$@"
+EOF
+chmod +x "$out/LeaveBell" "$out/LeaveBellDisplay"
 
 cp -r web/. "$out/web/"
 if [ -f dist/school-display/data/data.json ]; then

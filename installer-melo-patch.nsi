@@ -2,7 +2,7 @@
 ; 用法: makensis installer-melo-patch.nsi
 
 !define APP_NAME "LeaveBell"
-!define APP_VERSION "1.0.0"
+!define APP_VERSION "2.0.0"
 !define PATCH_NAME "LeaveBell 本地语音包补丁"
 !define REG_KEY "Software\${APP_NAME}"
 !ifndef ARCH

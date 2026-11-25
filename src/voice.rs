@@ -1,7 +1,9 @@
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use crate::sherpa_onnx::SherpaTts;
 
@@ -75,11 +77,6 @@ impl VoiceEngine {
         std::thread::spawn(move || {
             while let Ok(job) = rx.recv() {
                 *speak_state.lock().unwrap() = if job.class_id.is_empty() { None } else { Some(job.class_id.clone()) };
-                // 通知大屏开始播报（带班级编号）
-                if !job.class_id.is_empty() {
-                    let data = format!("{{\"class_id\":{}}}", serde_json::to_string(&job.class_id).unwrap());
-                    if let Some(send) = broadcast() { send("voice_start", &data); }
-                }
                 let _ = speak_tts(&base_thread, &sherpa_thread, &job);
                 *speak_state.lock().unwrap() = None;
                 if !job.class_id.is_empty() {
@@ -202,6 +199,7 @@ fn speak_edge(job: &SpeakJob, settings: &Value) -> Result<(), String> {
     if audio.audio_bytes.is_empty() {
         return Err("edge-tts 返回空音频".to_string());
     }
+    publish_audio(audio.audio_bytes.clone(), "audio/mpeg", &job.class_id, &job.text);
     let out = std::env::temp_dir().join(format!("school-edge-{}-{}.mp3",
         std::process::id(),
         std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis()
@@ -250,13 +248,16 @@ fn speak_sherpa(base: &Path, sherpa: &Mutex<Option<SherpaTts>>, job: &SpeakJob, 
         *sherpa.lock().unwrap() = None;
     }
     result?;
+    if let Ok(bytes) = std::fs::read(&out) {
+        publish_audio(bytes, "audio/wav", &job.class_id, &job.text);
+    }
     let played = play_wav(&out);
     let _ = std::fs::remove_file(&out);
     played
 }
 
 #[cfg(target_os = "windows")]
-fn play_wav(path: &Path) -> Result<(), String> {
+pub(crate) fn play_wav(path: &Path) -> Result<(), String> {
     use windows::Win32::Media::Audio::{PlaySoundW, SND_FILENAME, SND_SYNC};
     use windows::core::PCWSTR;
     let wide: Vec<u16> = path.to_string_lossy().encode_utf16().chain(std::iter::once(0)).collect();
@@ -291,13 +292,13 @@ fn play_external(path: &Path, mp3: bool) -> Result<(), String> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn play_wav(path: &Path) -> Result<(), String> {
+pub(crate) fn play_wav(path: &Path) -> Result<(), String> {
     play_external(path, false)
 }
 
 /// 用 Windows MCI 同步播放 MP3（PlaySoundW 不支持 MP3）
 #[cfg(target_os = "windows")]
-fn play_mp3(path: &Path) -> Result<(), String> {
+pub(crate) fn play_mp3(path: &Path) -> Result<(), String> {
     use windows::Win32::Media::Multimedia::mciSendStringW;
     use windows::core::PCWSTR;
     fn mci(cmd: &str) -> Result<(), String> {
@@ -315,7 +316,7 @@ fn play_mp3(path: &Path) -> Result<(), String> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn play_mp3(path: &Path) -> Result<(), String> {
+pub(crate) fn play_mp3(path: &Path) -> Result<(), String> {
     play_external(path, true)
 }
 
@@ -328,6 +329,50 @@ pub fn init_broadcast<F: Fn(&str, &str) + Send + Sync + 'static>(f: F) {
 
 fn broadcast() -> Option<&'static (dyn Fn(&str, &str) + Send + Sync)> {
     BROADCAST.get().map(|b| b.as_ref())
+}
+
+struct AudioItem {
+    data: Vec<u8>,
+    mime: &'static str,
+    at: Instant,
+}
+
+static AUDIO_CACHE: OnceLock<Mutex<HashMap<String, AudioItem>>> = OnceLock::new();
+static CURRENT_AUDIO: OnceLock<Mutex<Value>> = OnceLock::new();
+
+/// 保存一次合成结果，返回供大屏拉取的音频 ID。
+pub fn publish_audio(bytes: Vec<u8>, mime: &'static str, class_id: &str, text: &str) -> String {
+    let id = format!("{}", std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
+    let cache = AUDIO_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut map = cache.lock().unwrap();
+    map.retain(|_, v| v.at.elapsed() < Duration::from_secs(600));
+    map.insert(id.clone(), AudioItem { data: bytes, mime, at: Instant::now() });
+    drop(map);
+
+    if !class_id.is_empty() {
+        let event = json!({
+            "id": id,
+            "class_id": class_id,
+            "text": text,
+            "audio": format!("/api/voice/audio?id={}", id)
+        });
+        *CURRENT_AUDIO.get_or_init(|| Mutex::new(json!({}))).lock().unwrap() = event.clone();
+        if let Some(send) = broadcast() { send("voice_start", &event.to_string()); }
+    }
+    id
+}
+
+pub fn audio_by_id(id: &str) -> Option<(Vec<u8>, &'static str)> {
+    let cache = AUDIO_CACHE.get()?;
+    let map = cache.lock().unwrap();
+    map.get(id).map(|v| (v.data.clone(), v.mime))
+}
+
+pub fn current_audio() -> Value {
+    CURRENT_AUDIO.get()
+        .map(|v| v.lock().unwrap().clone())
+        .unwrap_or_else(|| json!({}))
 }
 
 /// 全局语音引擎，HTTP 层与 UI 层共用
