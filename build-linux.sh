@@ -18,7 +18,7 @@ mkdir -p "$out/web" "$out/data"
 
 cp "$bin" "$out/LeaveBell.bin"
 cp "$(dirname "$bin")/LeaveBellDisplay" "$out/LeaveBellDisplay.bin"
-cp "$root/assets/OFL-Noto-CJK.txt" "$out/OFL-Noto-CJK.txt"
+cp "assets/OFL-Noto-CJK.txt" "$out/OFL-Noto-CJK.txt"
 cat > "$out/LeaveBell" <<'EOF'
 #!/usr/bin/env bash
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
