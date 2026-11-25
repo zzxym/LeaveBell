@@ -1,6 +1,24 @@
 use serde_json::{json, Value};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+/// Linux deb/rpm 安装到 /opt，普通用户不可写；此时把状态文件放到用户配置目录。
+pub fn state_dir(base: &Path) -> PathBuf {
+    #[cfg(target_os = "linux")]
+    {
+        if base.starts_with("/opt/") {
+            let root = std::env::var_os("XDG_CONFIG_HOME")
+                .map(PathBuf::from)
+                .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
+                .unwrap_or_else(|| PathBuf::from("."));
+            let name = base.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "LeaveBell".into());
+            let dir = root.join("LeaveBell").join(name);
+            let _ = fs::create_dir_all(&dir);
+            return dir;
+        }
+    }
+    base.to_path_buf()
+}
 
 pub fn default_status_labels() -> Value {
     json!(["上课", "出教室", "抵达校门"])
@@ -195,7 +213,8 @@ impl Store {
             data["admin"] = json!({ "password": "" });
         }
         if data.get("port").is_none() {
-            data["port"] = json!(80);
+            let port = if cfg!(target_os = "linux") { 8080 } else { 80 };
+            data["port"] = json!(port);
         }
         if data.get("bindIp").is_none() {
             data["bindIp"] = json!("");

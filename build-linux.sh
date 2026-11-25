@@ -41,11 +41,7 @@ cp "$online/LeaveBellDisplay" "$screen/LeaveBellDisplay"
 chmod +x "$online/LeaveBell" "$online/LeaveBellDisplay" "$screen/LeaveBellDisplay"
 
 cp -r web/. "$online/web/"
-if [ -f dist/school-display/data/data.json ]; then
-  cp dist/school-display/data/data.json "$online/data/"
-else
-  printf '{}' > "$online/data/data.json"
-fi
+cp preset/data.json "$online/data/data.json"
 
 echo "Online payload: $(pwd)/$online"
 echo "Screen payload: $(pwd)/$screen"

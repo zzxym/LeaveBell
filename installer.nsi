@@ -3,8 +3,10 @@
 ; Call with /DVARIANT=... /DPKG_DIR=... and /DSCREEN for screen-only payload.
 
 !define APP_NAME "LeaveBell"
-!define APP_VERSION "2.0.0"
 !define APP_PUBLISHER "School"
+!ifndef APP_VERSION
+!define APP_VERSION "2.0.0"
+!endif
 !ifndef ARCH
 !define ARCH "amd64"
 !endif
@@ -12,16 +14,31 @@
 !define VARIANT "online"
 !endif
 !ifndef APP_TITLE
+!if "${VARIANT}" == "offline"
+!define APP_TITLE "LeaveBell Offline"
+!elseif "${VARIANT}" == "screen"
+!define APP_TITLE "LeaveBell Screen"
+!else
 !define APP_TITLE "LeaveBell Online"
 !endif
+!endif
 !ifndef APP_DIR
-!define APP_DIR "LeaveBell-online"
+!define APP_DIR "LeaveBell-${VARIANT}"
 !endif
 !ifndef REG_KEY
-!define REG_KEY "Software\${APP_NAME}\online"
+!define REG_KEY "Software\${APP_NAME}\${VARIANT}"
 !endif
 !ifndef PKG_DIR
-!define PKG_DIR "dist-native\online"
+!if "${VARIANT}" == "offline"
+!define PKG_DIR "dist-offline\win-${ARCH}"
+!else
+!define PKG_DIR "dist-native\${VARIANT}-${ARCH}"
+!endif
+!endif
+!if "${VARIANT}" == "screen"
+!ifndef SCREEN
+!define SCREEN
+!endif
 !endif
 
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_TITLE}"
@@ -82,6 +99,7 @@ Section "Uninstall"
     Delete "$INSTDIR\onnxruntime_providers_shared.dll"
   !endif
   Delete "$INSTDIR\OFL-Noto-CJK.txt"
+  Delete "$INSTDIR\display-config.json"
   RMDir "$INSTDIR"
 
   !ifdef SCREEN

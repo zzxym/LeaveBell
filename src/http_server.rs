@@ -943,7 +943,7 @@ mod tests {
             "statusLabels": default_status_labels(),
             "schedule": {"timers": [{"id": 0, "label": "定时器1", "enabled": true, "hour": 8, "minute": 30, "lastRunDate": "", "lastRunTime": "", "lastStatus": "idle", "lastMsg": "", "count": 0}]}
         });
-        Store { data, path: std::env::temp_dir().join("school-display-test.json") }
+        Store { data, path: std::env::temp_dir().join("leavebell-test.json") }
     }
 
     #[test]

@@ -42,7 +42,7 @@ cargo run --release
 
 ## 持久化数据
 
-数据保存在二进制文件同层的 `data/data.json`。独立大屏端配置保存在同层的 `display-config.json`。
+控制器数据默认保存在二进制文件同层的 `data/data.json`，独立大屏端配置保存在同层的 `display-config.json`。Linux deb/rpm 安装到 `/opt/LeaveBell-*` 时该目录不可写，状态文件改存到用户配置目录 `$XDG_CONFIG_HOME/LeaveBell/<安装目录名>`（未设置 `XDG_CONFIG_HOME` 时为 `~/.config/LeaveBell/<安装目录名>`）。离线版首次启动默认使用 sherpa 离线语音。
 
 ## 状态流转
 

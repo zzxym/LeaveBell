@@ -26,7 +26,13 @@ struct DisplayConfig {
 
 impl Default for DisplayConfig {
     fn default() -> Self {
-        Self { controller: "http://127.0.0.1:80".into(), voice: true }
+        // 与控制器端口保持一致：Linux 系统包使用非特权端口 8080，Windows 仍为 80。
+        let controller = if cfg!(target_os = "linux") {
+            "http://127.0.0.1:8080"
+        } else {
+            "http://127.0.0.1:80"
+        };
+        Self { controller: controller.into(), voice: true }
     }
 }
 
@@ -199,7 +205,8 @@ impl eframe::App for DisplayApp {
 }
 
 fn main() -> eframe::Result {
-    let cfg_path = exe_dir().join("display-config.json");
+    let base = exe_dir();
+    let cfg_path = model::state_dir(&base).join("display-config.json");
     let cfg = DisplayConfig::load(&cfg_path);
     let icon = Arc::new(
         eframe::icon_data::from_png_bytes(include_bytes!("../assets/app-icon.png"))

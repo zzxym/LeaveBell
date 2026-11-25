@@ -1845,6 +1845,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
+name = "leavebell"
+version = "2.0.0"
+dependencies = [
+ "base64 0.23.1",
+ "chrono",
+ "eframe",
+ "egui",
+ "embed-resource",
+ "libloading",
+ "msedge-tts",
+ "qrcodegen",
+ "rand 0.8.8",
+ "ring",
+ "serde",
+ "serde_json",
+ "tiny_http",
+ "ureq 2.12.1",
+ "windows",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.191"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2950,27 +2971,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9cb23c424d8ee841bb4d813677ca237e2a610067d594fec130f87d6093495ab5"
 dependencies = [
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "school-display"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "chrono",
- "eframe",
- "egui",
- "embed-resource",
- "libloading",
- "msedge-tts",
- "qrcodegen",
- "rand 0.8.8",
- "ring",
- "serde",
- "serde_json",
- "tiny_http",
- "ureq 2.12.1",
- "windows",
 ]
 
 [[package]]

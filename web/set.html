@@ -1186,6 +1186,13 @@ async function loadScan() {
 }
 
 // ---------- 语音播报设置 ----------
+// 离线音色显示名（value 为模型路径+说话人编号）
+function voiceLabel(v) {
+  if (v === "sherpa-onnx-vits-zh-ll/2") return "女声";
+  if (v === "sherpa-onnx-vits-zh-ll/3") return "男声";
+  return v;
+}
+
 async function loadVoiceVoices(engine, prev) {
   const r = await fetch("/api/voice?engine=" + encodeURIComponent(engine));
   const j = await r.json();
@@ -1193,7 +1200,7 @@ async function loadVoiceVoices(engine, prev) {
   const voices = j.data.voices || [];
   const sel = el("vcVoice");
   const options = voices.length
-    ? voices.map(v => `<option value="${v}">${v}</option>`).join("")
+    ? voices.map(v => `<option value="${v}">${voiceLabel(v)}</option>`).join("")
     : `<option value="">（暂无音色）</option>`;
   sel.innerHTML = options;
   sel.value = voices.includes(prev) ? prev : (voices[0] || "");

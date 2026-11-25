@@ -8,7 +8,7 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-const DISPLAY_VIEWPORT: &str = "school-display-screen";
+const DISPLAY_VIEWPORT: &str = "leavebell-screen";
 
 /// 数字转中文（班级名格式化用，支持到 99）
 fn cn_num(n: u32) -> String {

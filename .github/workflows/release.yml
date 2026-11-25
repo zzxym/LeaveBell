@@ -52,9 +52,11 @@ jobs:
             $nsis = $nsisPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
           }
           if (-not $nsis) { throw 'NSIS not found' }
-          & $nsis /V2 /DARCH=${{ matrix.arch }} /DVARIANT=online '/DAPP_TITLE=LeaveBell Online' '/DAPP_DIR=LeaveBell-online' '/DREG_KEY=Software\LeaveBell\online' /DPKG_DIR="dist-native\online-${{ matrix.arch }}" installer.nsi
-          & $nsis /V2 /DARCH=${{ matrix.arch }} /DVARIANT=offline '/DAPP_TITLE=LeaveBell Offline' '/DAPP_DIR=LeaveBell-offline' '/DREG_KEY=Software\LeaveBell\offline' /DPKG_DIR="dist-offline\win-${{ matrix.arch }}" installer.nsi
-          & $nsis /V2 /DARCH=${{ matrix.arch }} /DVARIANT=screen /DSCREEN '/DAPP_TITLE=LeaveBell Screen' '/DAPP_DIR=LeaveBell-screen' '/DREG_KEY=Software\LeaveBell\screen' /DPKG_DIR="dist-native\screen-${{ matrix.arch }}" installer.nsi
+          $ref = "${{ github.ref_name }}"
+          if ($ref -match '^v?(\d+\.\d+\.\d+.*)$') { $ver = $Matches[1] } else { $ver = "2.0.0" }
+          & $nsis /V2 /DARCH=${{ matrix.arch }} /DAPP_VERSION=$ver /DVARIANT=online '/DAPP_TITLE=LeaveBell Online' '/DAPP_DIR=LeaveBell-online' '/DREG_KEY=Software\LeaveBell\online' /DPKG_DIR="dist-native\online-${{ matrix.arch }}" installer.nsi
+          & $nsis /V2 /DARCH=${{ matrix.arch }} /DAPP_VERSION=$ver /DVARIANT=offline '/DAPP_TITLE=LeaveBell Offline' '/DAPP_DIR=LeaveBell-offline' '/DREG_KEY=Software\LeaveBell\offline' /DPKG_DIR="dist-offline\win-${{ matrix.arch }}" installer.nsi
+          & $nsis /V2 /DARCH=${{ matrix.arch }} /DAPP_VERSION=$ver /DVARIANT=screen /DSCREEN '/DAPP_TITLE=LeaveBell Screen' '/DAPP_DIR=LeaveBell-screen' '/DREG_KEY=Software\LeaveBell\screen' /DPKG_DIR="dist-native\screen-${{ matrix.arch }}" installer.nsi
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4

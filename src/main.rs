@@ -68,17 +68,18 @@ fn main() -> eframe::Result {
     // 固定使用 exe 所在目录下的 web/data，避免不同启动方式（cwd 不同）
     // 加载到不同的数据文件，导致保存的配置/排序在重启后"丢失"。
     let web_dir = base.join("web");
-    let data_dir = base.join("data");
+    let data_dir = model::state_dir(&base).join("data");
     let data_file = data_dir.join("data.json");
     let screen_cfg_path = data_dir.join("screen.json");
 
     let mut store = model::Store::load(data_file);
-    // 优先级：命令行 > PORT 环境变量 > data.json.port > 默认 80
+    // 优先级：命令行 > PORT 环境变量 > data.json.port > 默认端口
+    let default_port = if cfg!(target_os = "linux") { 8080 } else { 80 };
     let port: u16 = std::env::args()
         .find_map(|a| a.parse::<u16>().ok())
         .or_else(|| std::env::var("PORT").ok().and_then(|v| v.parse().ok()))
         .or_else(|| store.data["port"].as_u64().and_then(|v| u16::try_from(v).ok()))
-        .unwrap_or(80);
+        .unwrap_or(default_port);
     let mut bind_ip = store.data["bindIp"].as_str().unwrap_or("").trim().to_string();
     if bind_ip.is_empty() {
         let ips = app::local_ipv4s();

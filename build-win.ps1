@@ -30,13 +30,8 @@ foreach ($out in @($online, $screen)) {
 New-Item -ItemType Directory -Path (Join-Path $online "web") -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $online "data") -Force | Out-Null
 
-$presetData = Join-Path $root "dist\school-display\data\data.json"
-if (-not (Test-Path $presetData)) { $presetData = Join-Path $root "preset\data.json" }
-if (Test-Path $presetData) {
-    Copy-Item $presetData (Join-Path $online "data\data.json") -Force
-} else {
-    [System.IO.File]::WriteAllText((Join-Path $online "data\data.json"), "{}", (New-Object System.Text.UTF8Encoding($false)))
-}
+$presetData = Join-Path $root "preset\data.json"
+Copy-Item $presetData (Join-Path $online "data\data.json") -Force
 
 Write-Host "== 2/3 Copying files =="
 Copy-Item $release (Join-Path $online "LeaveBell.exe")

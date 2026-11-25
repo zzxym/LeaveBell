@@ -28,7 +28,7 @@ pub struct VoiceEngine {
 }
 
 /// 部分 TTS 运行时无法处理非 ASCII 路径。若安装目录含中文，把子目录复制到
-/// %TEMP%\school-display-tts 作为执行副本；否则直接用原目录。
+/// %TEMP%\leavebell-tts 作为执行副本；否则直接用原目录。
 fn prepare_base(original: &Path, sub: &str, marker: &str) -> PathBuf {
     let has_non_ascii = original.to_string_lossy().chars().any(|c| !c.is_ascii());
     if !has_non_ascii {
@@ -38,7 +38,7 @@ fn prepare_base(original: &Path, sub: &str, marker: &str) -> PathBuf {
     if !src.is_dir() {
         return original.to_path_buf();
     }
-    let staging = std::env::temp_dir().join("school-display-tts");
+    let staging = std::env::temp_dir().join("leavebell-tts");
     let dst = staging.join(sub);
     let need_copy = !dst.join(marker).is_file()
         || fs_mtime(&src.join(marker)) > fs_mtime(&dst.join(marker));
