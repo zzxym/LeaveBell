@@ -126,19 +126,24 @@ impl MachineInfo {
     }
 }
 
-// 单串由 machine(64) + cpu(64) + mac(64) 拼接，共 192 位十六进制
-fn parts(code: &str) -> (&str, &str, &str) {
-    if code.len() >= 192 {
-        (&code[0..64], &code[64..128], &code[128..192])
-    } else {
-        (code, "", "")
-    }
+fn valid_expiry(s: &str) -> bool {
+    chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").is_ok()
 }
 
-pub fn machine_info() -> MachineInfo {
+fn machine_info(base: &Path) -> MachineInfo {
     let cpu_raw = cpu_signature();
     let macs = physical_macs().join(",");
-    let machine = hex(digest(&SHA256, format!("{}|{}", cpu_raw, macs).as_bytes()).as_ref());
+    // 首次运行生成随机盐并持久化：同型号同网卡的机器也能区分
+    let salt_path = base.join("machine.id");
+    let salt = match fs::read(&salt_path) {
+        Ok(v) if v.len() >= 16 => v,
+        _ => {
+            let v: [u8; 16] = rand::random();
+            let _ = fs::write(&salt_path, v);
+            v.to_vec()
+        }
+    };
+    let machine = hex(digest(&SHA256, format!("{}|{}|{}", cpu_raw, macs, hex(&salt)).as_bytes()).as_ref());
     let cpu = hex(digest(&SHA256, cpu_raw.as_bytes()).as_ref());
     let mac = hex(digest(&SHA256, macs.as_bytes()).as_ref());
     MachineInfo { machine: format!("{}{}{}", machine, cpu, mac) }
@@ -156,7 +161,7 @@ fn public_key() -> Result<Vec<u8>, String> {
 }
 
 pub fn verify(base: &Path) -> VerifyResult {
-    let machine = machine_info();
+    let machine = machine_info(base);
     let data = match fs::read_to_string(license_file_path(base)) {
         Ok(v) => v,
         Err(_) => return VerifyResult {
@@ -186,23 +191,11 @@ pub fn verify(base: &Path) -> VerifyResult {
     if UnparsedPublicKey::new(&ED25519, &public).verify(payload.as_bytes(), &sig).is_err() {
         return VerifyResult { ok: false, expires, message: "许可证验签失败".into(), machine };
     }
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-    if !expires.is_empty() && expires < today {
-        return VerifyResult { ok: false, expires, message: "许可证已过期".into(), machine };
+    if !valid_expiry(&expires) {
+        return VerifyResult { ok: false, expires, message: "许可证到期日期无效".into(), machine };
     }
     if lic_code == machine.machine {
         return VerifyResult { ok: true, expires, message: String::new(), machine };
-    }
-    if lic_code.len() == 192 && machine.machine.len() == 192 {
-        let (m1, c1, a1) = parts(&machine.machine);
-        let (m2, c2, a2) = parts(&lic_code);
-        // 允许 CPU 或网卡其中一项变化；两项都变则要求重新授权
-        if m1 == m2 || c1 == c2 || a1 == a2 {
-            return VerifyResult {
-                ok: true, expires,
-                message: "硬件已变化，建议重新授权".into(), machine,
-            };
-        }
     }
     VerifyResult { ok: false, expires, message: "机器码不匹配，请重新授权".into(), machine }
 }
@@ -227,6 +220,9 @@ pub fn reload(base: &Path, state: &mut LicenseState) {
     state.registered = result.ok;
     state.expires = result.expires;
     state.warn = result.message;
+    if result.ok {
+        state.expired = false;
+    }
     write_machine_file(base, &result.machine);
 }
 
@@ -255,7 +251,10 @@ pub fn sign(base: &Path, expires: &str, features: &str) -> Result<String, String
         .filter(|v| !v.is_empty())
         .ok_or_else(|| "machine.txt 内容不完整".to_string())?;
     if machine.len() != 64 && machine.len() != 192 {
-        return Err("机器码长度应为 64 或 192 位十六进制".into());
+        return Err("机器码长度应为 64 位十六进制".into());
+    }
+    if !valid_expiry(expires) {
+        return Err("到期日期必须为 YYYY-MM-DD".into());
     }
     let private = fs::read_to_string(base.join("license_private.key"))
         .map_err(|_| "缺少 license_private.key".to_string())?;

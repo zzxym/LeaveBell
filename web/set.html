@@ -309,7 +309,7 @@
               <span>启用语音播报</span>
               <input id="vcEnabled" type="checkbox" style="width:auto;">
             </label>
-            <label class="field">
+            <label class="field" id="vcEngineRow">
               <span>语音引擎</span>
               <select id="vcEngine" style="width:220px;">
                 <option value="edge">在线 TTS（Edge）</option>
@@ -510,23 +510,23 @@ function renderClassGroups() {
       const tchs = teachers.filter(t => t.class_id === c.class_id);
       const tchRows = tchs.map(t => `
         <div class="tch-row">
-          <span class="tch-phone">${t.phone}</span>
-          <span class="tch-name">${t.name || "—"}</span>
-          <button class="btn btn-mini danger" data-unbind="${t.phone}">解绑</button>
+          <span class="tch-phone">${escapeHtml(t.phone)}</span>
+          <span class="tch-name">${escapeHtml(t.name || "—")}</span>
+          <button class="btn btn-mini danger" data-unbind="${escapeHtml(t.phone)}">解绑</button>
         </div>`).join("");
       const open = expandedClasses.has(c.class_id);
       return `
       <div class="class-item ${open ? "expanded" : ""}">
-        <div class="ci-head" data-toggle="${c.class_id}">
-          <span class="ci-id">${c.class_id}</span>
-          <span class="ci-name">${c.class_name}</span>
+        <div class="ci-head" data-toggle="${escapeHtml(c.class_id)}">
+          <span class="ci-id">${escapeHtml(c.class_id)}</span>
+          <span class="ci-name">${escapeHtml(c.class_name)}</span>
           <span class="ci-count">${tchs.length} 位教师</span>
           <span class="ci-arrow">${open ? "▴" : "▾"}</span>
         </div>
         <div class="ci-body ${open ? "open" : ""}">
-          <button class="btn btn-mini btn-primary tch-add-btn" data-cid="${c.class_id}">+ 添加老师</button>
+          <button class="btn btn-mini btn-primary tch-add-btn" data-cid="${escapeHtml(c.class_id)}">+ 添加老师</button>
           <div class="tch-list">${tchRows || `<p class="muted">暂未绑定教师</p>`}</div>
-          <button class="btn btn-mini danger ci-del" data-cid="${c.class_id}">删除班级</button>
+          <button class="btn btn-mini danger ci-del" data-cid="${escapeHtml(c.class_id)}">删除班级</button>
         </div>
       </div>`;
     }).join("");
@@ -585,10 +585,14 @@ function renderClassGroups() {
 // 状态名称统一来自「大屏显示设置」中的状态1/2/3名称，界面文本一律不硬编码
 let STATUS_LABEL = { 0: "上课", 1: "出教室", 2: "抵达校门" };
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+}
+
 function statusName(i) {
   const k = i === 0 || i === 1 || i === 2 ? i : 0;
   const n = STATUS_LABEL[k];
-  return (n && String(n).trim()) ? String(n).trim() : "状态" + (k + 1);
+  return escapeHtml((n && String(n).trim()) ? String(n).trim() : "状态" + (k + 1));
 }
 
 function applyStatusLabels(labels) {
@@ -671,8 +675,8 @@ function render() {
   el("rows").innerHTML = list.map(c => {
     const st = "s" + c.status;
     return `
-      <div class="card ${st} ov-card" data-id="${c.class_id}">
-        <div class="card-name">${classLabel(c)}</div>
+      <div class="card ${st} ov-card" data-id="${escapeHtml(c.class_id)}">
+        <div class="card-name">${escapeHtml(classLabel(c))}</div>
         <div class="card-status">${statusName(c.status)}</div>
         <div class="card-time">${overviewCountdown(c)}</div>
       </div>`;
@@ -942,7 +946,7 @@ function renderDisplayPreview() {
     const targets = (gd.enabled !== false && Array.isArray(gd.targets)) ? gd.targets : [];
     const cls = "s" + c.status + ` layout-${layout}`
       + (targets.includes("bg") ? " gd-bg" : "");
-    const nameHtml = `<div class="card-name${targets.includes("name") ? " gd-elem" : ""}">${classLabel(c, el("dsNameFmt").value)}</div>`;
+    const nameHtml = `<div class="card-name${targets.includes("name") ? " gd-elem" : ""}">${escapeHtml(classLabel(c, el("dsNameFmt").value))}</div>`;
     const statusHtml = `<div class="card-status${targets.includes("text") ? " gd-elem" : ""}">${label}</div>`;
     const timeHtml = `<div class="card-time${targets.includes("time") ? " gd-elem" : ""}">${countdown}</div>`;
     // 与大屏端一致的三档排版
@@ -956,7 +960,7 @@ function renderDisplayPreview() {
       content = `${nameHtml}<div class="card-meta meta-col">${statusHtml}${timeHtml}</div>`;
     }
     return `
-      <div class="card ${cls}" draggable="true" data-idx="${i}" data-cid="${cid}">
+      <div class="card ${cls}" draggable="true" data-idx="${i}" data-cid="${escapeHtml(cid)}">
         ${content}
         <span class="ds-idx">${i + 1}</span>
         <span class="ds-drag" title="拖动排序">⠿</span>
@@ -1188,8 +1192,8 @@ async function loadScan() {
 // ---------- 语音播报设置 ----------
 // 离线音色显示名（value 为模型路径+说话人编号）
 function voiceLabel(v) {
-  if (v === "sherpa-onnx-vits-zh-ll/2") return "女声";
-  if (v === "sherpa-onnx-vits-zh-ll/3") return "男声";
+  if (v === "sherpa-onnx-vits-zh-ll/2") return "男声";
+  if (v === "sherpa-onnx-vits-zh-ll/3") return "女声";
   return v;
 }
 
@@ -1200,7 +1204,7 @@ async function loadVoiceVoices(engine, prev) {
   const voices = j.data.voices || [];
   const sel = el("vcVoice");
   const options = voices.length
-    ? voices.map(v => `<option value="${v}">${voiceLabel(v)}</option>`).join("")
+    ? voices.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(voiceLabel(v))}</option>`).join("")
     : `<option value="">（暂无音色）</option>`;
   sel.innerHTML = options;
   sel.value = voices.includes(prev) ? prev : (voices[0] || "");
@@ -1214,6 +1218,7 @@ async function loadVoice() {
     const s = j.data.settings || {};
     const engine = s.engine === "sherpa" ? "sherpa" : "edge";
     el("vcEngine").value = engine;
+    el("vcEngineRow").style.display = engine === "sherpa" ? "" : "none";
     await loadVoiceVoices(engine, s.voice || "");
     el("vcEnabled").checked = !!s.enabled;
     const speed = Number(s.speed) || 1;
@@ -1234,7 +1239,7 @@ el("vcVolume").addEventListener("input", e => { el("vcVolumeOut").textContent = 
 function collectVoiceSettings() {
   return {
     enabled: !!el("vcEnabled").checked,
-    engine: el("vcEngine").value || "edge",
+    engine: el("vcEngineRow").style.display === "none" ? "edge" : (el("vcEngine").value || "edge"),
     voice: el("vcVoice").value || "",
     speed: Number(el("vcSpeed").value),
     volume: Number(el("vcVolume").value)
@@ -1591,9 +1596,9 @@ function renderTimers() {
     const statusText = t.lastStatus === "success" ? "执行成功" : t.lastStatus === "error" ? "执行失败" : "待执行";
     const statusCls = t.lastStatus === "success" ? "s2" : t.lastStatus === "error" ? "s1" : "s0";
     return `
-      <div class="timer-card" data-id="${t.id}">
+      <div class="timer-card" data-id="${escapeHtml(t.id)}">
         <div class="timer-head">
-          <span class="timer-title">${t.label || TIMER_LABELS[t.id] || "定时器"}</span>
+          <span class="timer-title">${escapeHtml(t.label || TIMER_LABELS[t.id] || "定时器")}</span>
           <span class="badge ${statusCls}">${statusText}</span>
         </div>
         <div class="timer-form">
@@ -1612,11 +1617,11 @@ function renderTimers() {
         <div class="timer-status">
           <div class="status-row">
             <span class="status-label">上次执行</span>
-            <span class="timer-lastrun">${t.lastRunTime || "—"}</span>
+            <span class="timer-lastrun">${escapeHtml(t.lastRunTime || "—")}</span>
           </div>
           <div class="status-row">
             <span class="status-label">执行结果</span>
-            <span class="timer-lastmsg">${t.lastMsg || "—"}</span>
+            <span class="timer-lastmsg">${escapeHtml(t.lastMsg || "—")}</span>
           </div>
           <div class="status-row">
             <span class="status-label">累计执行</span>

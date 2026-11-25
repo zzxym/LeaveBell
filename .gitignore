@@ -23,10 +23,12 @@ machine.txt
 license.json
 license-tool-result.txt
 
-# 授权私钥绝不入库
+# 授权私钥与本地算号机目录绝不入库
 license_private.key
+/license-tool-local/
 需求.md
 # 临时文件
+/target-local/
 _chk.txt
 icon.png
 shot_grad.png

@@ -3,7 +3,6 @@
 #[allow(dead_code)] mod app;
 #[allow(dead_code)] mod http_server;
 #[allow(dead_code)] mod license;
-#[allow(dead_code)] mod license_ui;
 #[allow(dead_code)] mod model;
 #[allow(dead_code)] mod monitors;
 #[allow(dead_code)] mod sherpa_onnx;
@@ -273,7 +272,7 @@ impl eframe::App for DisplayApp {
                     }
                 }
                 ui.separator();
-                if ui.button("退出软件").clicked() { std::process::exit(0); }
+                if ui.button("关闭大屏").clicked() { std::process::exit(0); }
             });
         self.settings_open = open;
         if save { self.save_settings(); }

@@ -5,25 +5,51 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
 pub static TRIAL_EXPIRED: AtomicBool = AtomicBool::new(false);
 
+struct Session { role: String, created: Instant }
+const SESSION_TTL: Duration = Duration::from_secs(12 * 3600);
+const SESSION_MAX: usize = 256;
+
+type Sessions = HashMap<String, Session>;
+
+fn session_insert(sessions: &mut Sessions, token: String, role: String) {
+    let now = Instant::now();
+    sessions.retain(|_, s| now.duration_since(s.created) < SESSION_TTL);
+    if sessions.len() >= SESSION_MAX {
+        if let Some(oldest) = sessions.iter()
+            .min_by_key(|(_, s)| s.created)
+            .map(|(k, _)| k.clone()) {
+            sessions.remove(&oldest);
+        }
+    }
+    sessions.insert(token, Session { role, created: now });
+}
+
+type SubId = u64;
+
 pub struct Broadcast {
-    inner: RwLock<Vec<Sender<String>>>,
+    inner: RwLock<Vec<(SubId, mpsc::SyncSender<String>)>>,
+    next_id: std::sync::atomic::AtomicU64,
 }
 
 impl Broadcast {
     pub fn new() -> Self {
-        Self { inner: RwLock::new(Vec::new()) }
+        Self { inner: RwLock::new(Vec::new()), next_id: std::sync::atomic::AtomicU64::new(1) }
     }
-    pub fn subscribe(&self) -> Receiver<String> {
-        let (tx, rx) = mpsc::channel();
-        self.inner.write().unwrap().push(tx);
-        rx
+    pub fn subscribe(&self) -> (SubId, Receiver<String>) {
+        let (tx, rx) = mpsc::sync_channel(64);
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        self.inner.write().unwrap().push((id, tx));
+        (id, rx)
+    }
+    pub fn unsubscribe(&self, id: SubId) {
+        self.inner.write().unwrap().retain(|(i, _)| *i != id);
     }
     pub fn send(&self, event: &str) {
         self.send_data(event, "{}");
@@ -31,25 +57,15 @@ impl Broadcast {
 
     pub fn send_data(&self, event: &str, data: &str) {
         let msg = format!("event: {}\ndata: {}\n\n", event, data);
-        let mut dead = Vec::new();
-        for (i, tx) in self.inner.read().unwrap().iter().enumerate() {
-            if tx.send(msg.clone()).is_err() {
-                dead.push(i);
-            }
-        }
-        if !dead.is_empty() {
-            let mut list = self.inner.write().unwrap();
-            for i in dead.into_iter().rev() {
-                list.remove(i);
-            }
-        }
+        let mut list = self.inner.write().unwrap();
+        list.retain(|(_, tx)| tx.send(msg.clone()).is_ok());
     }
 }
 
 #[derive(Clone)]
 pub struct WebDir(pub PathBuf);
 
-type Shared = (Arc<Mutex<Store>>, Arc<Broadcast>, WebDir, Arc<Mutex<HashMap<String, String>>>);
+type Shared = (Arc<Mutex<Store>>, Arc<Broadcast>, WebDir, Arc<Mutex<Sessions>>);
 
 pub fn start_server(
     bind_ip: &str,
@@ -139,12 +155,20 @@ fn read_body(req: &mut Request) -> Option<Value> {
     serde_json::from_slice(&buf).ok()
 }
 
-fn valid_session(sessions: &HashMap<String, String>, token: &str) -> bool {
-    !token.is_empty() && sessions.get(token).map(|v| v == "admin").unwrap_or(false)
+fn session_alive(s: &Session, ttl: Duration) -> bool {
+    s.created.elapsed() < ttl
 }
 
-fn session_phone(sessions: &HashMap<String, String>, token: &str) -> Option<String> {
-    sessions.get(token).cloned()
+fn valid_session(sessions: &Sessions, token: &str) -> bool {
+    !token.is_empty() && sessions.get(token)
+        .map(|s| s.role == "admin" && session_alive(s, SESSION_TTL))
+        .unwrap_or(false)
+}
+
+fn session_phone(sessions: &Sessions, token: &str) -> Option<String> {
+    sessions.get(token)
+        .filter(|s| session_alive(s, SESSION_TTL))
+        .map(|s| s.role.clone())
 }
 
 fn num(v: Option<&Value>) -> Option<f64> {
@@ -189,7 +213,7 @@ fn handle_get(
     path: &str,
     store: Arc<Mutex<Store>>,
     webdir: WebDir,
-    sessions: Arc<Mutex<HashMap<String, String>>>,
+    sessions: Arc<Mutex<Sessions>>,
 ) -> Result<(), ()> {
     match path {
         "/api/ui-version" => {
@@ -260,7 +284,7 @@ fn handle_get(
             if teachers.iter().any(|t| t["phone"].as_str() == Some(&phone)
                 && t["class_id"].as_str() == Some("admin")) {
                 let token = gen_token();
-                sessions.lock().unwrap().insert(token.clone(), "guest-admin".to_string());
+                session_insert(&mut sessions.lock().unwrap(), token.clone(), "guest-admin".into());
                 json_response(req, json!({"ok": true, "role": "admin", "phone": phone, "token": token}), 200);
                 return Ok(());
             }
@@ -287,7 +311,7 @@ fn handle_get(
             let classes: Vec<Value> = bound.iter()
                 .filter_map(|c| db.find_class(c).cloned()).collect();
             let token = gen_token();
-            sessions.lock().unwrap().insert(token.clone(), phone.clone());
+            session_insert(&mut sessions.lock().unwrap(), token.clone(), phone.clone());
             json_response(req, json!({
                 "ok": true, "role": "teacher", "phone": phone, "token": token,
                 "class": class, "classes": classes,
@@ -372,7 +396,7 @@ fn handle_post(
     path: &str,
     store: Arc<Mutex<Store>>,
     broadcast: Arc<Broadcast>,
-    sessions: Arc<Mutex<HashMap<String, String>>>,
+    sessions: Arc<Mutex<Sessions>>,
 ) -> Result<(), ()> {
     let body = match read_body(&mut req) {
         Some(v) => v,
@@ -448,7 +472,7 @@ fn handle_post(
             }
             if pwd == expected {
                 let token = gen_token();
-                sessions.lock().unwrap().insert(token.clone(), "admin".to_string());
+                session_insert(&mut sessions.lock().unwrap(), token.clone(), "admin".into());
                 json_response(req, json!({"ok": true, "token": token, "statusLabels": db.data["statusLabels"].clone()}), 200);
             } else {
                 json_response(req, json!({"ok": false, "msg": "密码错误"}), 401);
@@ -500,7 +524,9 @@ fn handle_post(
                 }
                 let mut db = store.lock().unwrap();
                 db.data["statusLabels"] = labels.clone();
-                db.persist();
+                if let Err(e) = db.persist_checked() {
+                    json_response(req, json!({"ok": false, "msg": format!("保存失败: {}", e)}), 500); return Ok(());
+                }
                 broadcast.send("display");
                 json_response(req, json!({"ok": true, "msg": "已保存", "data": labels}), 200);
             } else {
@@ -518,7 +544,9 @@ fn handle_post(
             }
             let mut db = store.lock().unwrap();
             db.data["scanServer"] = json!(server);
-            db.persist();
+            if let Err(e) = db.persist_checked() {
+                json_response(req, json!({"ok": false, "msg": format!("保存失败: {}", e)}), 500); return Ok(());
+            }
             json_response(req, json!({"ok": true, "msg": "已保存", "data": server}), 200);
         }
         "/api/admin/password" => {
@@ -535,7 +563,10 @@ fn handle_post(
                 json_response(req, json!({"ok": false, "msg": "新密码不能为空"}), 200);
             } else {
                 db.data["admin"]["password"] = json!(new);
-                db.persist();
+                if let Err(e) = db.persist_checked() {
+                    json_response(req, json!({"ok": false, "msg": format!("保存失败: {}", e)}), 500); return Ok(());
+                }
+                sessions.lock().unwrap().clear();
                 json_response(req, json!({"ok": true}), 200);
             }
         }
@@ -557,7 +588,9 @@ fn handle_post(
                     "class_id": cid, "class_name": name, "grade": grade,
                     "status": 0, "update_time": Value::Null
                 }));
-                db.persist();
+                if let Err(e) = db.persist_checked() {
+                    json_response(req, json!({"ok": false, "msg": format!("保存失败: {}", e)}), 500); return Ok(());
+                }
                 broadcast.send("update");
                 json_response(req, json!({"ok": true, "msg": "已添加"}), 200);
             }
@@ -573,7 +606,9 @@ fn handle_post(
             db.classes_mut().retain(|c| c["class_id"].as_str() != Some(cid));
             db.data["teachers"].as_array_mut().unwrap().retain(|t| t["class_id"].as_str() != Some(cid));
             if db.classes().len() < before {
-                db.persist();
+                if let Err(e) = db.persist_checked() {
+                    json_response(req, json!({"ok": false, "msg": format!("保存失败: {}", e)}), 500); return Ok(());
+                }
                 broadcast.send("update");
                 json_response(req, json!({"ok": true}), 200);
             } else {
@@ -587,7 +622,13 @@ fn handle_post(
             }
             // 立即执行指定定时器
             if body["run_now"].as_bool().unwrap_or(false) {
-                let tid = num(body.get("timer_id")).unwrap_or(-1.0) as u64;
+                let tid = match body.get("timer_id").and_then(Value::as_u64) {
+                    Some(t) => t,
+                    None => { json_response(req, json!({"ok": false, "msg": "定时器编号无效"}), 400); return Ok(()); }
+                };
+                if !timer_exists(&store.lock().unwrap(), tid) {
+                    json_response(req, json!({"ok": false, "msg": "定时器不存在"}), 404); return Ok(());
+                }
                 let mut db = store.lock().unwrap();
                 let (ok, msg) = run_timer_locked(&mut db, tid);
                 let data = db.data["schedule"].clone();
@@ -609,7 +650,9 @@ fn handle_post(
                         }
                     }
                 }
-                db.persist();
+                if let Err(e) = db.persist_checked() {
+                    json_response(req, json!({"ok": false, "msg": format!("保存失败: {}", e)}), 500); return Ok(());
+                }
                 let data = db.data["schedule"].clone();
                 drop(db);
                 json_response(req, json!({"ok": true, "msg": "已保存", "data": data}), 200);
@@ -643,7 +686,9 @@ fn handle_post(
             let volume = num(settings.get("volume")).unwrap_or(1.0).clamp(0.0, 1.0);
             settings["volume"] = json!(volume);
             db.data["voice"] = settings.clone();
-            db.persist();
+            if let Err(e) = db.persist_checked() {
+                json_response(req, json!({"ok": false, "msg": format!("保存失败: {}", e)}), 500); return Ok(());
+            }
             drop(db);
             crate::voice::update_settings(settings.clone());
             json_response(req, json!({"ok": true, "msg": "已保存", "data": settings}), 200);
@@ -672,6 +717,8 @@ fn handle_post(
             let mut db = store.lock().unwrap();
             if phone.is_empty() || cid.is_empty() {
                 json_response(req, json!({"ok": false, "msg": "手机号与班级必填"}), 200);
+            } else if phone == "admin" {
+                json_response(req, json!({"ok": false, "msg": "admin 为保留账号，不能作为手机号"}), 200);
             } else if db.find_class(cid).is_none() {
                 json_response(req, json!({"ok": false, "msg": "班级不存在"}), 200);
             } else {
@@ -684,7 +731,9 @@ fn handle_post(
                 } else {
                     teachers.push(json!({"phone": phone, "class_id": cid, "name": name}));
                 }
-                db.persist();
+                if let Err(e) = db.persist_checked() {
+                    json_response(req, json!({"ok": false, "msg": format!("保存失败: {}", e)}), 500); return Ok(());
+                }
                 json_response(req, json!({"ok": true}), 200);
             }
         }
@@ -698,7 +747,9 @@ fn handle_post(
             let before = db.data["teachers"].as_array().unwrap().len();
             db.data["teachers"].as_array_mut().unwrap().retain(|t| t["phone"].as_str() != Some(phone));
             if db.data["teachers"].as_array().unwrap().len() < before {
-                db.persist();
+                if let Err(e) = db.persist_checked() {
+                    json_response(req, json!({"ok": false, "msg": format!("保存失败: {}", e)}), 500); return Ok(());
+                }
                 json_response(req, json!({"ok": true}), 200);
             } else {
                 json_response(req, json!({"ok": false, "msg": "教师不存在"}), 200);
@@ -716,17 +767,30 @@ fn set_status(store: &Arc<Mutex<Store>>, cid: &str, status: i32, phone: &str, re
 
 /// 执行指定定时器：把所有班级重置为状态0，记录执行信息。
 /// 返回执行结果消息；在持有 store 锁时调用。
+fn timer_exists(db: &Store, timer_id: u64) -> bool {
+    db.data["schedule"]["timers"].as_array()
+        .map(|a| a.iter().any(|t| t["id"].as_u64() == Some(timer_id)))
+        .unwrap_or(false)
+}
+
 fn run_timer_locked(db: &mut Store, timer_id: u64) -> (bool, String) {
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     let label = db.data["schedule"]["timers"].as_array()
         .and_then(|a| a.iter().find(|t| t["id"].as_u64() == Some(timer_id)))
-        .and_then(|t| t["label"].as_str())
-        .unwrap_or("定时器").to_string();
+        .map(|t| (
+            t["label"].as_str().unwrap_or("定时器").to_string(),
+            t["lastRunDate"].as_str().unwrap_or("").to_string(),
+        ))
+        .unwrap_or(("定时器".into(), String::new()));
+    if label.1 == today {
+        return (false, "该定时器今日已执行".into());
+    }
+    let label = label.0;
     let ids: Vec<String> = db.classes().iter()
         .filter_map(|c| c["class_id"].as_str().map(|s| s.to_string())).collect();
     for cid in &ids {
-        set_status_locked(db, cid, 0, "schedule", "");
+        set_status_locked_no_persist(db, cid, 0, "schedule", "");
     }
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     let now = now_str();
     if let Some(timers) = db.data["schedule"]["timers"].as_array_mut() {
         if let Some(t) = timers.iter_mut().find(|t| t["id"].as_u64() == Some(timer_id)) {
@@ -743,6 +807,17 @@ fn run_timer_locked(db: &mut Store, timer_id: u64) -> (bool, String) {
 
 /// 在已持有 Store 锁的情况下执行状态写入（避免重复加锁）
 pub(crate) fn set_status_locked(db: &mut Store, cid: &str, status: i32, phone: &str, reason: &str) -> bool {
+    let ok = set_status_locked_no_persist(db, cid, status, phone, reason);
+    if ok {
+        if let Err(e) = db.persist_checked() {
+            eprintln!("状态写入持久化失败: {}", e);
+            return false;
+        }
+    }
+    ok
+}
+
+fn set_status_locked_no_persist(db: &mut Store, cid: &str, status: i32, phone: &str, reason: &str) -> bool {
     let old;
     {
         let c = match db.find_class_mut(cid) { Some(c) => c, None => return false };
@@ -757,16 +832,14 @@ pub(crate) fn set_status_locked(db: &mut Store, cid: &str, status: i32, phone: &
         "old_status": old, "new_status": status, "reason": reason, "time": now_str()
     }));
     db.data["nextLogId"] = json!(id + 1);
-    db.persist();
-    // 语音播报：状态切换成功后入队（speak 非阻塞，不持锁等音频）
-    let class_name = db.find_class(cid)
-        .and_then(|c| c["class_name"].as_str())
-        .unwrap_or(cid).to_string();
-    let label = db.data["statusLabels"].as_array()
-        .and_then(|a| a.get(status.max(0).min(2) as usize))
-        .and_then(|v| v.as_str()).unwrap_or("").to_string();
     // 重置为状态0（初始状态）时不播报，避免定时任务批量重置时嘈杂
     if status != 0 {
+        let class_name = db.find_class(cid)
+            .and_then(|c| c["class_name"].as_str())
+            .unwrap_or(cid).to_string();
+        let label = db.data["statusLabels"].as_array()
+            .and_then(|a| a.get(status.max(0).min(2) as usize))
+            .and_then(|v| v.as_str()).unwrap_or("").to_string();
         crate::voice::speak_status(&class_name, &label, cid);
     }
     true
@@ -789,7 +862,12 @@ fn update_display(db: &mut Store, cfg: &Value) {
     if let Some(arr) = cfg.get("order").and_then(|v| v.as_array()) {
         for v in arr {
             let s = v.as_str().unwrap_or("");
-            if s.is_empty() || db.find_class(s).is_some() { order.push(json!(s)); }
+            // 空串是前端有意的空占位卡片，保留；真实班级需存在且去重
+            if s.is_empty()
+                || (db.find_class(s).is_some() && !order.iter().any(|o| o.as_str() == Some(s)))
+            {
+                order.push(json!(s));
+            }
         }
     }
     for c in db.classes() {
@@ -820,8 +898,8 @@ fn sse(req: Request, broadcast: Arc<Broadcast>) -> Result<(), ()> {
     let conn = Header::from_bytes(&b"Connection"[..], &b"keep-alive"[..]).unwrap();
 
     // SSE 需要保持连接：用自定义 Read 流持续输出
-    let rx = broadcast.subscribe();
-    let stream = SseStream { rx, first: true, last_ping: std::time::Instant::now() };
+    let (id, rx) = broadcast.subscribe();
+    let stream = SseStream { broadcast: broadcast.clone(), id, rx, first: true, last_ping: std::time::Instant::now(), pending: Vec::new() };
     let response = Response::empty(StatusCode(200))
         .with_header(ct).with_header(cc).with_header(conn)
         .with_data(stream, None);
@@ -830,31 +908,41 @@ fn sse(req: Request, broadcast: Arc<Broadcast>) -> Result<(), ()> {
 }
 
 struct SseStream {
+    broadcast: Arc<Broadcast>,
+    id: SubId,
     rx: Receiver<String>,
     first: bool,
     last_ping: std::time::Instant,
+    pending: Vec<u8>,
+}
+
+impl Drop for SseStream {
+    fn drop(&mut self) {
+        self.broadcast.unsubscribe(self.id);
+    }
 }
 
 impl std::io::Read for SseStream {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         loop {
+            if !self.pending.is_empty() {
+                let n = self.pending.len().min(buf.len());
+                buf[..n].copy_from_slice(&self.pending[..n]);
+                self.pending.drain(..n);
+                return Ok(n);
+            }
             if self.first {
                 self.first = false;
-                let msg = b": connected\n\n";
-                buf[..msg.len()].copy_from_slice(msg);
-                return Ok(msg.len());
+                self.pending.extend_from_slice(b": connected\n\n");
+                continue;
             }
             if let Ok(msg) = self.rx.recv_timeout(Duration::from_millis(1000)) {
-                let bytes = msg.as_bytes();
-                let n = bytes.len().min(buf.len());
-                buf[..n].copy_from_slice(&bytes[..n]);
-                return Ok(n);
+                self.pending.extend_from_slice(msg.as_bytes());
+                continue;
             }
             if self.last_ping.elapsed() > Duration::from_secs(25) {
                 self.last_ping = std::time::Instant::now();
-                let msg = b": ping\n\n";
-                buf[..msg.len()].copy_from_slice(msg);
-                return Ok(msg.len());
+                self.pending.extend_from_slice(b": ping\n\n");
             }
         }
     }
@@ -943,19 +1031,52 @@ mod tests {
             "statusLabels": default_status_labels(),
             "schedule": {"timers": [{"id": 0, "label": "定时器1", "enabled": true, "hour": 8, "minute": 30, "lastRunDate": "", "lastRunTime": "", "lastStatus": "idle", "lastMsg": "", "count": 0}]}
         });
-        Store { data, path: std::env::temp_dir().join("leavebell-test.json") }
+        let path = std::env::temp_dir().join(format!(
+            "leavebell-test-{}-{}.json", std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        Store { data, path }
     }
 
     #[test]
     fn admin_session_only_accepts_admin() {
         let mut sessions = HashMap::new();
-        sessions.insert("admin-token".to_string(), "admin".to_string());
-        sessions.insert("teacher-token".to_string(), "13800000000".to_string());
-        sessions.insert("guest-token".to_string(), "guest-admin".to_string());
+        session_insert(&mut sessions, "admin-token".into(), "admin".into());
+        session_insert(&mut sessions, "teacher-token".into(), "13800000000".into());
+        session_insert(&mut sessions, "guest-token".into(), "guest-admin".into());
         assert!(valid_session(&sessions, "admin-token"));
         assert!(!valid_session(&sessions, "teacher-token"));
         assert!(!valid_session(&sessions, "guest-token"));
         assert!(!valid_session(&sessions, ""));
+    }
+
+    #[test]
+    fn session_expires_and_oldest_evicted() {
+        let mut sessions = HashMap::new();
+        session_insert(&mut sessions, "admin-token".into(), "admin".into());
+        assert!(valid_session(&sessions, "admin-token"));
+        let fresh = Session { role: "admin".into(), created: Instant::now() };
+        assert!(session_alive(&fresh, Duration::from_secs(60)));
+        let aged = Session { role: "admin".into(), created: Instant::now() };
+        assert!(!session_alive(&aged, Duration::ZERO));
+        for i in 0..SESSION_MAX {
+            session_insert(&mut sessions, format!("t{}", i), "admin".into());
+        }
+        assert!(sessions.len() <= SESSION_MAX);
+        assert!(valid_session(&sessions, &format!("t{}", SESSION_MAX - 1)));
+    }
+
+    #[test]
+    fn timer_rejects_same_day_and_unknown_id() {
+        let mut db = test_store();
+        assert!(timer_exists(&db, 0));
+        assert!(!timer_exists(&db, 99));
+        let (ok, _) = run_timer_locked(&mut db, 0);
+        assert!(ok);
+        let (again, msg) = run_timer_locked(&mut db, 0);
+        assert!(!again);
+        assert!(msg.contains("已执行"));
+        assert_eq!(db.data["schedule"]["timers"][0]["count"], 1);
     }
 
     #[test]
@@ -974,6 +1095,17 @@ mod tests {
         let mut db = test_store();
         assert!(!set_status_locked(&mut db, "999", 1, "admin", ""));
         assert_eq!(db.data["logs"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn update_display_order_keeps_placeholder_and_dedups_real() {
+        let mut db = test_store();
+        let cfg = json!({"order": ["101", "", "nope", "101", ""]});
+        update_display(&mut db, &cfg);
+        let order = db.display()["order"].as_array().unwrap();
+        let ids: Vec<&str> = order.iter().map(|v| v.as_str().unwrap()).collect();
+        // 空串占位保留（可多个），未知班级丢弃，重复真实班级去重
+        assert_eq!(ids, vec!["101", "", ""]);
     }
 
     #[test]

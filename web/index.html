@@ -40,10 +40,14 @@ const STATUS = {
   1: { cls: "s1" },
   2: { cls: "s2" },
 };
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+}
+
 function statusLabel(i) {
   const labs = (Array.isArray(displaySettings.statusLabels)) ? displaySettings.statusLabels : [];
   const n = labs[i];
-  return (n && String(n).trim()) ? String(n).trim() : "状态" + ((i % 3) + 1);
+  return escapeHtml((n && String(n).trim()) ? String(n).trim() : "状态" + ((i % 3) + 1));
 }
 
 function elapsedTime(s) {
@@ -280,7 +284,7 @@ function cardHtml(c) {
   const gd = gdNormalize(adv.gradient)[Math.max(0, Math.min(2, c.status))] || {};
   const targets = (gd.enabled !== false && Array.isArray(gd.targets)) ? gd.targets : [];
   const cls = st.cls + (targets.includes("bg") ? " gd-bg" : "");
-  const nameHtml = `<div class="card-name${targets.includes("name") ? " gd-elem" : ""}">${classLabel(c)}</div>`;
+  const nameHtml = `<div class="card-name${targets.includes("name") ? " gd-elem" : ""}">${escapeHtml(classLabel(c))}</div>`;
   const statusHtml = `<div class="card-status${targets.includes("text") ? " gd-elem" : ""}">${statusLabel(c.status)}</div>`;
   const counting = c.status === 1 || c.status === 2;
   const timeText = counting ? elapsedTime(c.update_time) : "";
@@ -291,7 +295,7 @@ function cardHtml(c) {
     : `${nameHtml}<div class="card-meta">${statusHtml}${timeHtml}</div>`;
   const speaking = speakingCid && c.class_id === speakingCid ? " speaking" : "";
   return `
-    <div class="card ${cls}${speaking}" data-cid="${c.class_id || ""}">
+    <div class="card ${cls}${speaking}" data-cid="${escapeHtml(c.class_id || "")}">
       ${content}
     </div>`;
 }

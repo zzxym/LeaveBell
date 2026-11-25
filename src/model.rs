@@ -172,10 +172,17 @@ fn default_schedule() -> Value {
 
 impl Store {
     pub fn load(path: PathBuf) -> Self {
-        let data: Value = fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_else(|| Value::Null);
+        let data: Value = match fs::read_to_string(&path) {
+            Ok(s) => match serde_json::from_str(&s) {
+                Ok(v) => v,
+                Err(_) => {
+                    let _ = fs::copy(&path, path.with_extension("json.bak"));
+                    eprintln!("data.json 解析失败，已备份为 .json.bak，将以默认数据启动");
+                    Value::Null
+                }
+            },
+            Err(_) => Value::Null,
+        };
 
         let mut data = if data.is_object() { data } else { json!({}) };
 
@@ -274,16 +281,20 @@ impl Store {
     }
 
     pub fn persist(&self) {
+        if let Err(e) = self.persist_checked() {
+            eprintln!("保存 data.json 失败: {}", e);
+        }
+    }
+
+    pub fn persist_checked(&self) -> Result<(), String> {
         if let Some(parent) = self.path.parent() {
-            let _ = fs::create_dir_all(parent);
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        if let Ok(s) = serde_json::to_string_pretty(&self.data) {
-            // 先写临时文件再原子替换，避免写入中断损坏 data.json
-            let tmp = self.path.with_extension("json.tmp");
-            if fs::write(&tmp, s).is_ok() {
-                let _ = fs::rename(&tmp, &self.path);
-            }
-        }
+        let s = serde_json::to_string_pretty(&self.data).map_err(|e| e.to_string())?;
+        // 先写临时文件再原子替换，避免写入中断损坏 data.json
+        let tmp = self.path.with_extension("json.tmp");
+        fs::write(&tmp, s).map_err(|e| e.to_string())?;
+        fs::rename(&tmp, &self.path).map_err(|e| e.to_string())
     }
 
     pub fn classes(&self) -> &Vec<Value> {

@@ -1,6 +1,6 @@
 [package]
 name = "leavebell"
-version = "2.0.0"
+version = "2.0.1"
 edition = "2021"
 
 [[bin]]
@@ -46,7 +46,7 @@ ureq = { version = "2", features = ["json"] }
 
 # Windows API（显示器枚举、网卡枚举）
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Media_Audio", "Win32_Media_Multimedia", "Win32_System_LibraryLoader", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_Networking_WinSock"] }
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Media_Audio", "Win32_Media_Multimedia", "Win32_System_LibraryLoader", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_Networking_WinSock", "Win32_UI_Controls_Dialogs"] }
 
 # 构建期把 .ico 嵌入可执行文件（资源管理器/taskbar 显示的软件图标）
 [target.'cfg(windows)'.build-dependencies]

@@ -2,8 +2,8 @@
 
 mod app;
 mod http_server;
+#[allow(dead_code)]
 mod license;
-mod license_ui;
 mod model;
 mod monitors;
 mod sherpa_onnx;
@@ -25,46 +25,11 @@ fn main() -> eframe::Result {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let base = exe_dir();
     let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|a| a == "--license-keygen") {
-        let msg = license::keygen(&base).unwrap_or_else(|e| e);
-        let _ = std::fs::write(base.join("license-tool-result.txt"), msg);
-        return Ok(());
-    }
-    if let Some(pos) = args.iter().position(|a| a == "--license-sign") {
-        let expires = args.get(pos + 1).cloned().unwrap_or_else(|| "2099-12-31".into());
-        let features = args.get(pos + 2).cloned().unwrap_or_else(|| "full".into());
-        let msg = license::sign(&base, &expires, &features).unwrap_or_else(|e| e);
-        let _ = std::fs::write(base.join("license-tool-result.txt"), msg);
-        return Ok(());
-    }
     if args.iter().any(|a| a == "--license-check") {
         let r = license::verify(&base);
         let msg = format!("registered={}\nexpires={}\nmessage={}\n", r.ok, r.expires, r.message);
         let _ = std::fs::write(base.join("license-tool-result.txt"), msg);
         return Ok(());
-    }
-    let exe_name = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.file_name().map(|s| s.to_string_lossy().into_owned()))
-        .unwrap_or_default();
-    if args.iter().any(|a| a == "--license-ui") || exe_name.starts_with("LeaveBell-License-Tool") {
-        let icon = Arc::new(
-            eframe::icon_data::from_png_bytes(include_bytes!("../assets/app-icon.png"))
-                .expect("窗口图标加载失败"),
-        );
-        let options = eframe::NativeOptions {
-            viewport: egui::ViewportBuilder::default()
-                .with_title("LeaveBell 算号机")
-                .with_inner_size([760.0, 560.0])
-                .with_min_inner_size([600.0, 420.0])
-                .with_icon(icon),
-            ..Default::default()
-        };
-        return eframe::run_native(
-            "LeaveBell 算号机",
-            options,
-            Box::new(move |_cc| Ok(Box::new(license_ui::LicenseToolApp::new(base)))),
-        );
     }
     let license_state = Arc::new(Mutex::new(license::initial(&base)));
     // 固定使用 exe 所在目录下的 web/data，避免不同启动方式（cwd 不同）

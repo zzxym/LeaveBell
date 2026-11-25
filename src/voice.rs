@@ -205,7 +205,7 @@ fn speak_edge(job: &SpeakJob, settings: &Value) -> Result<(), String> {
         std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis()
     ));
     std::fs::write(&out, &audio.audio_bytes).map_err(|e| e.to_string())?;
-    let result = play_mp3(&out);
+    let result = if display_sound_enabled() { play_mp3(&out) } else { Ok(()) };
     let _ = std::fs::remove_file(&out);
     result
 }
@@ -248,12 +248,38 @@ fn speak_sherpa(base: &Path, sherpa: &Mutex<Option<SherpaTts>>, job: &SpeakJob, 
         *sherpa.lock().unwrap() = None;
     }
     result?;
+    // 离线模型输出电平偏低，按用户音量放大后再分发/播放
+    let volume = settings["volume"].as_f64().unwrap_or(1.0).clamp(0.0, 1.0) as f32;
+    amplify_wav(&out, volume * 2.5);
     if let Ok(bytes) = std::fs::read(&out) {
         publish_audio(bytes, "audio/wav", &job.class_id, &job.text);
     }
-    let played = play_wav(&out);
+    let played = if display_sound_enabled() { play_wav(&out) } else { Ok(()) };
     let _ = std::fs::remove_file(&out);
     played
+}
+
+/// 原地放大 16-bit PCM WAV；sherpa-onnx 输出为 PCM16，超范围截断。
+fn amplify_wav(path: &Path, gain: f32) {
+    let Ok(bytes) = std::fs::read(path) else { return };
+    if bytes.len() < 44 { return; }
+    let mut pos = 12usize;
+    let mut start = None;
+    while pos + 8 <= bytes.len() {
+        let size = u32::from_le_bytes(bytes[pos + 4..pos + 8].try_into().unwrap()) as usize;
+        if &bytes[pos..pos + 4] == b"data" { start = Some(pos + 8); break; }
+        pos += 8 + size + size % 2;
+    }
+    let Some(start) = start else { return };
+    let mut out = bytes;
+    let mut i = start;
+    while i + 1 < out.len() {
+        let v = i16::from_le_bytes([out[i], out[i + 1]]);
+        let amped = (v as f32 * gain).round().clamp(i16::MIN as f32, i16::MAX as f32) as i16;
+        out[i..i + 2].copy_from_slice(&amped.to_le_bytes());
+        i += 2;
+    }
+    let _ = std::fs::write(path, out);
 }
 
 #[cfg(target_os = "windows")]
@@ -408,4 +434,40 @@ pub fn voice_settings_snapshot() -> Value {
     VOICE_SETTINGS.get()
         .map(|s| s.lock().unwrap().clone())
         .unwrap_or_else(|| json!({"voice": "", "speed": 1.0, "volume": 1.0}))
+}
+
+/// 大屏声音开关：只控制播报音频的播放，不影响 TTS 生成、缓存与推送。
+pub fn display_sound_enabled() -> bool {
+    voice_settings_snapshot()["displayEnabled"].as_bool().unwrap_or(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn amplify_wav_doubles_pcm16_samples() {
+        let path = std::env::temp_dir().join(format!("leavebell-gain-{}.wav", std::process::id()));
+        let mut wav = b"RIFF".to_vec();
+        wav.extend_from_slice(&40u32.to_le_bytes());
+        wav.extend_from_slice(b"WAVEfmt ");
+        wav.extend_from_slice(&16u32.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes());
+        wav.extend_from_slice(&16000u32.to_le_bytes());
+        wav.extend_from_slice(&32000u32.to_le_bytes());
+        wav.extend_from_slice(&2u16.to_le_bytes());
+        wav.extend_from_slice(&16u16.to_le_bytes());
+        wav.extend_from_slice(b"data");
+        wav.extend_from_slice(&4u32.to_le_bytes());
+        wav.extend_from_slice(&1000i16.to_le_bytes());
+        wav.extend_from_slice(&(-1000i16).to_le_bytes());
+        std::fs::write(&path, &wav).unwrap();
+
+        amplify_wav(&path, 2.0);
+        let out = std::fs::read(&path).unwrap();
+        assert_eq!(i16::from_le_bytes([out[44], out[45]]), 2000);
+        assert_eq!(i16::from_le_bytes([out[46], out[47]]), -2000);
+        let _ = std::fs::remove_file(&path);
+    }
 }

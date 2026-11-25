@@ -291,10 +291,10 @@ fn draw_display_grid(
     classes: &[Value],
     display: &Value,
     status_labels: &[String],
-    screens: &[ScreenInfo],
-    screen_cfg: &Arc<Mutex<ScreenConfig>>,
+    _screens: &[ScreenInfo],
+    _screen_cfg: &Arc<Mutex<ScreenConfig>>,
     menu_state: &Arc<Mutex<bool>>,
-    settings: &Arc<Mutex<SoftwareSettings>>,
+    _settings: &Arc<Mutex<SoftwareSettings>>,
     speaking: Option<&str>,
 ) {
     let cols = display["cols"].as_i64().unwrap_or(4).max(1) as usize;
@@ -421,37 +421,46 @@ fn draw_display_grid(
             draw_voice_border(&painter, rect, t, radius);
         }
     }
-    let menu_open = *menu_state.lock().unwrap();
-    if menu_open {
-        let mut close = false;
-        egui::Window::new("切换大屏显示位置")
-            .collapsible(false).resizable(false)
-            .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
-            .show(ui.ctx(), |ui| {
-                ui.label("选择大屏要显示在哪块屏幕：");
-                for screen in screens {
-                    if ui.button(&screen.name).clicked() {
-                        screen_cfg.lock().unwrap().set_display_screen(screen.id.clone());
-                        close = true;
-                    }
+}
+
+fn render_display_settings(
+    ctx: &Context,
+    menu_state: &Arc<Mutex<bool>>,
+    screens: &[ScreenInfo],
+    cfg: &Arc<Mutex<ScreenConfig>>,
+    store: &Arc<Mutex<Store>>,
+) {
+    if !*menu_state.lock().unwrap() { return; }
+    let mut open = true;
+    let screen_list = screens.to_vec();
+    egui::Window::new("大屏设置")
+        .collapsible(false).resizable(false)
+        .min_width(380.0)
+        .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
+        .open(&mut open)
+        .show(ctx, |ui| {
+            ui.label("切换大屏显示位置：");
+            for screen in &screen_list {
+                if ui.button(&screen.name).clicked() {
+                    cfg.lock().unwrap().set_display_screen(screen.id.clone());
                 }
-                ui.separator();
-                ui.horizontal(|ui| {
-                    if ui.button("确定").clicked() { close = true; }
-                    if ui.button("软件设置").clicked() {
-                        let mut s = settings.lock().unwrap();
-                        s.open = true;
-                        s.on_main = false;
-                    }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("退出软件").clicked() {
-                            std::process::exit(0);
-                        }
-                    });
-                });
-            });
-        if close { *menu_state.lock().unwrap() = false; }
-    }
+            }
+            ui.separator();
+            let mut display_sound = {
+                let db = store.lock().unwrap();
+                db.data["voice"]["displayEnabled"].as_bool().unwrap_or(true)
+            };
+            if ui.checkbox(&mut display_sound, "大屏声音").clicked() {
+                let updated = {
+                    let mut db = store.lock().unwrap();
+                    db.data["voice"]["displayEnabled"] = serde_json::json!(display_sound);
+                    db.persist();
+                    db.data["voice"].clone()
+                };
+                crate::voice::update_settings(updated);
+            }
+        });
+    *menu_state.lock().unwrap() = open;
 }
 
 #[allow(dead_code)]
@@ -474,7 +483,6 @@ struct SoftwareSettings {
     open: bool,
     on_main: bool,
     ip: String,
-    port: String,
     ips: Vec<String>,
     pwd: String,
     pwd_confirm: String,
@@ -557,24 +565,6 @@ fn render_software_settings(
                         ui.selectable_value(&mut s.ip, ip.clone(), ip);
                     }
                 });
-            ui.horizontal(|ui| {
-                ui.label("监听端口：");
-                ui.add(egui::TextEdit::singleline(&mut s.port).desired_width(120.0));
-            });
-            ui.separator();
-            let mut voice_enabled = {
-                let db = store.lock().unwrap();
-                db.data["voice"]["enabled"].as_bool().unwrap_or(true)
-            };
-            if ui.checkbox(&mut voice_enabled, "大屏语音播报").clicked() {
-                let updated = {
-                    let mut db = store.lock().unwrap();
-                    db.data["voice"]["enabled"] = serde_json::json!(voice_enabled);
-                    db.persist();
-                    db.data["voice"].clone()
-                };
-                crate::voice::update_settings(updated);
-            }
             ui.separator();
             ui.label("重设管理密码（留空表示不修改）：");
             ui.horizontal(|ui| {
@@ -596,10 +586,6 @@ fn render_software_settings(
     s.open = open;
     if !save { return; }
     s.msg.clear();
-    let port = match s.port.trim().parse::<u16>().ok().filter(|p| *p > 0) {
-        Some(p) => p,
-        None => { s.msg = "端口必须是 1-65535 的数字".into(); return; }
-    };
     if !s.pwd.is_empty() || !s.pwd_confirm.is_empty() {
         if s.pwd.trim().is_empty() { s.msg = "密码不能为空".into(); return; }
         if s.pwd != s.pwd_confirm { s.msg = "两次输入的密码不一致".into(); return; }
@@ -607,7 +593,6 @@ fn render_software_settings(
     {
         let mut db = store.lock().unwrap();
         db.data["bindIp"] = serde_json::json!(s.ip.clone());
-        db.data["port"] = serde_json::json!(port);
         if !s.pwd.is_empty() {
             db.data["admin"]["password"] = serde_json::json!(s.pwd.clone());
         }
@@ -674,7 +659,6 @@ impl App {
             open: false,
             on_main: false,
             ip,
-            port: port_input.clone(),
             ips,
             pwd: String::new(),
             pwd_confirm: String::new(),
@@ -823,6 +807,30 @@ impl App {
         });
     }
 
+#[cfg(target_os = "windows")]
+fn pick_license_path() -> Option<String> {
+    use windows::core::{w, PWSTR};
+    use windows::Win32::UI::Controls::Dialogs::{
+        GetOpenFileNameW, OPENFILENAMEW, OFN_FILEMUSTEXIST, OFN_PATHMUSTEXIST,
+    };
+    let mut file = [0u16; 260];
+    let mut ofn = OPENFILENAMEW {
+        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
+        lpstrFilter: w!("JSON 文件\0*.json\0所有文件\0*.*\0\0"),
+        nFilterIndex: 1,
+        lpstrFile: PWSTR(file.as_mut_ptr()),
+        nMaxFile: file.len() as u32,
+        Flags: OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST,
+        ..Default::default()
+    };
+    if unsafe { GetOpenFileNameW(&mut ofn) }.as_bool() {
+        let len = file.iter().position(|&c| c == 0).unwrap_or(file.len());
+        Some(String::from_utf16_lossy(&file[..len]))
+    } else {
+        None
+    }
+}
+
     fn render_registration(&mut self, ctx: &Context) {
         if !self.reg_open { return; }
         let (machine_text, warn, expires, registered) = {
@@ -848,8 +856,14 @@ impl App {
                 if !warn.is_empty() { ui.colored_label(Color32::from_rgb(220, 120, 40), &warn); }
                 if !message.is_empty() { ui.colored_label(Color32::from_rgb(220, 60, 60), &message); }
                 ui.separator();
-                ui.label("指定 license.json 路径（可粘贴完整路径），导入后自动复制到 exe 目录并验证：");
-                ui.add(egui::TextEdit::singleline(&mut license_path).desired_width(500.0));
+                ui.label("指定 license.json 路径，导入后自动复制到 exe 目录并验证：");
+                ui.horizontal(|ui| {
+                    ui.add(egui::TextEdit::singleline(&mut license_path).desired_width(460.0));
+                    #[cfg(target_os = "windows")]
+                    if ui.button("浏览...").clicked() {
+                        if let Some(p) = Self::pick_license_path() { license_path = p; }
+                    }
+                });
                 ui.horizontal(|ui| {
                     if ui.button("导入并验证").clicked() { import = true; }
                     if ui.button("重新验证").clicked() { recheck = true; }
@@ -876,6 +890,9 @@ impl App {
                 .unwrap_or_default();
             let mut l = self.license_state.lock().unwrap();
             crate::license::reload(&base, &mut l);
+            if l.registered {
+                crate::http_server::TRIAL_EXPIRED.store(false, Ordering::Relaxed);
+            }
             self.reg_msg = if l.registered { "注册成功".into() } else { l.warn.clone() };
         }
         if close { self.reg_open = false; }
@@ -1067,6 +1084,7 @@ impl eframe::App for App {
         }
         if trial_expired {
             self.render_trial_expired(ctx);
+            self.render_registration(ctx);
             return;
         }
         self.render_controller(ctx);
@@ -1109,9 +1127,7 @@ impl eframe::App for App {
                 move |ctx, _class| {
                     ctx.request_repaint_after(std::time::Duration::from_millis(33));
                     if ctx.input(|i| i.key_pressed(egui::Key::F2)) {
-                        let mut s = settings.lock().unwrap();
-                        s.open = true;
-                        s.on_main = false;
+                        *menu.lock().unwrap() = true;
                     }
                     let cfg_guard = cfg.lock().unwrap();
                     if let Some(sid) = cfg_guard.display_screen() {
@@ -1142,13 +1158,7 @@ impl eframe::App for App {
                             .and_then(|g| g.clone());
                         draw_display_grid(ui, db.classes(), db.display(), &labels, &screens, &cfg, &menu, &settings, speaking.as_deref());
                     });
-                    let show_settings_display = {
-                        let s = settings.lock().unwrap();
-                        s.open && !s.on_main
-                    };
-                    if show_settings_display {
-                        render_software_settings(ctx, &settings, &store);
-                    }
+                    render_display_settings(ctx, &menu, &screens, &cfg, &store);
                 },
             );
         } else if !local_display {

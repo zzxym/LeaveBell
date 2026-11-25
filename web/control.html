@@ -62,6 +62,9 @@
 let me = null;
 // 状态名称统一由后端下发（管理端「大屏显示设置」中的状态1/2/3名称），不硬编码
 let STATUS_LABELS = ["上课", "出教室", "抵达校门"];
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+}
 // 班级名格式由管理端下发，与大屏/扫码页保持一致
 let NAME_FMT = "cn";
 
@@ -85,7 +88,7 @@ function classLabel(c) {
 
 function fillSelect(sel, classes, current) {
   sel.innerHTML = classes.map(c =>
-    `<option value="${c.class_id}"${c.class_id === current ? " selected" : ""}>${classLabel(c)}</option>`
+    `<option value="${escapeHtml(c.class_id)}"${c.class_id === current ? " selected" : ""}>${escapeHtml(classLabel(c))}</option>`
   ).join("");
 }
 
