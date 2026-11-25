@@ -32,6 +32,7 @@ Section "Install"
   SetOutPath "$INSTDIR"
   ; 主程序
   File "${PKG_DIR}\${APP_EXE}"
+  File "${PKG_DIR}\OFL-Noto-CJK.txt"
   ; 基础版只含 web / data（语音使用在线 edge-tts，无需本地运行时）
   File /r "${PKG_DIR}\web"
   File /r "${PKG_DIR}\data"
@@ -57,6 +58,7 @@ SectionEnd
 ; ---- 卸载 ----
 Section "Uninstall"
   Delete "$INSTDIR\${APP_EXE}"
+  Delete "$INSTDIR\OFL-Noto-CJK.txt"
   Delete "$INSTDIR\uninstall.exe"
   RMDir /r "$INSTDIR\web"
   RMDir /r "$INSTDIR\data"
