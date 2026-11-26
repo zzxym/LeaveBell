@@ -67,7 +67,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) {
 
 impl VoiceEngine {
     pub fn new(base: PathBuf) -> Self {
-        let base = prepare_base(&base, "melo", "models/sherpa-onnx-vits-zh-ll/model.onnx");
+        let base = prepare_base(&base, "models", "sherpa-onnx-vits-zh-ll/model.onnx");
         let (tx, rx) = mpsc::channel::<SpeakJob>();
         let speaking = Arc::new(Mutex::new(None::<String>));
         let speak_state = speaking.clone();
@@ -96,7 +96,7 @@ impl VoiceEngine {
     pub fn ensure_sherpa(&self) {
         let mut guard = self.sherpa.lock().unwrap();
         if guard.is_none() {
-            let model_dir = self.base.join("melo").join("models").join("sherpa-onnx-vits-zh-ll");
+            let model_dir = self.base.join("models").join("sherpa-onnx-vits-zh-ll");
             *guard = SherpaTts::load_vits(&model_dir.to_string_lossy()).ok();
         }
     }
@@ -113,13 +113,15 @@ impl VoiceEngine {
         if engine != "sherpa" {
             return vec![];
         }
-        let model = self.base.join("melo").join("models").join("sherpa-onnx-vits-zh-ll").join("model.onnx");
+        let model = self.base.join("models").join("sherpa-onnx-vits-zh-ll").join("model.onnx");
         if !model.is_file() {
             return vec![];
         }
-        // sherpa-onnx VITS（MeloTTS zh-ll）：模型仅含单一女声说话人，sid 切换无效，
-        // 因此只提供唯一音色，避免前端出现误导性的男声选项。
-        vec!["sherpa-onnx-vits-zh-ll/2".into()]
+        // sherpa-onnx VITS：/2 女声，/3 男声
+        vec![
+            "sherpa-onnx-vits-zh-ll/2".into(),
+            "sherpa-onnx-vits-zh-ll/3".into(),
+        ]
     }
 
     /// 试听：读取当前设置生成一段固定文本播报（不绑定班级）
@@ -233,7 +235,7 @@ fn speak_sherpa(base: &Path, sherpa: &Mutex<Option<SherpaTts>>, job: &SpeakJob, 
         result = {
             let mut guard = sherpa.lock().unwrap();
             if guard.is_none() {
-                let model_dir = base.join("melo").join("models").join("sherpa-onnx-vits-zh-ll");
+                let model_dir = base.join("models").join("sherpa-onnx-vits-zh-ll");
                 *guard = SherpaTts::load_vits(&model_dir.to_string_lossy()).ok();
             }
             match guard.as_ref() {

@@ -1192,8 +1192,8 @@ async function loadScan() {
 // ---------- 语音播报设置 ----------
 // 离线音色显示名（value 为模型路径+说话人编号）
 function voiceLabel(v) {
-  // sherpa-onnx-vits-zh-ll 模型仅含单一女声说话人，仅此一个音色
   if (v === "sherpa-onnx-vits-zh-ll/2") return "女声";
+  if (v === "sherpa-onnx-vits-zh-ll/3") return "男声";
   return v;
 }
 

@@ -78,7 +78,7 @@ jobs:
             dist-native/screen-${{ matrix.arch }}/LeaveBellScreen.exe
             dist-offline/win-${{ matrix.arch }}/LeaveBell.exe
             dist-offline/win-${{ matrix.arch }}/sherpa-onnx-c-api.dll
-            dist-offline/win-${{ matrix.arch }}/melo/models/sherpa-onnx-vits-zh-ll/model.onnx
+            dist-offline/win-${{ matrix.arch }}/models/sherpa-onnx-vits-zh-ll/model.onnx
           if-no-files-found: error
 
   build-linux:
@@ -241,7 +241,7 @@ jobs:
           $screenDisplay = "$payload/dist-native/screen-$arch/LeaveBellScreen.exe"
           $offlineExe = "$payload/dist-offline/win-$arch/LeaveBell.exe"
           $dll = "$payload/dist-offline/win-$arch/sherpa-onnx-c-api.dll"
-          $model = "$payload/dist-offline/win-$arch/melo/models/sherpa-onnx-vits-zh-ll/model.onnx"
+          $model = "$payload/dist-offline/win-$arch/models/sherpa-onnx-vits-zh-ll/model.onnx"
           Assert-Pe $onlineExe
           Assert-Pe $onlineDisplay
           Assert-Pe $screenDisplay
