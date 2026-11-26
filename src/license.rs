@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 // 发布时替换为 --license-keygen 生成的 license_public.key 内容（base64，32 字节）
-const PUBLIC_KEY_B64: &str = "rSkMGGehq04Ni1crbguo4MxHvKvcCArvHIxyJwybV2A=";
+const PUBLIC_KEY_B64: &str = "pwYRagUoUgf5nukzNJ1NG8A38GkfqJQbMfZUBdiCIcE=";
 
 #[derive(Clone)]
 pub struct MachineInfo {

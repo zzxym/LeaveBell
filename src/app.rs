@@ -325,9 +325,6 @@ fn draw_display_grid(
 
     let radius = adv["radius"].as_f64().unwrap_or(10.0) as f32;
     let layout = adv["layout"].as_i64().unwrap_or(2).clamp(1, 3);
-    let name_scale = adv["nameScale"].as_f64().unwrap_or(60.0) as f32;
-    let status_scale = adv["statusScale"].as_f64().unwrap_or(28.0) as f32;
-    let time_scale = adv["timeScale"].as_f64().unwrap_or(28.0) as f32;
     let s0_bg = hex_color(adv["s0Bg"].as_str().unwrap_or("#000000"), Color32::BLACK);
     let s0_text = hex_color(adv["s0Text"].as_str().unwrap_or("#ffffff"), Color32::WHITE);
     let s1_bg = hex_color(adv["s1Bg"].as_str().unwrap_or("#b4b400"), Color32::from_rgb(180, 180, 0));
@@ -344,6 +341,11 @@ fn draw_display_grid(
         *menu_state.lock().unwrap() = true;
     }
     let canvas = ui.max_rect();
+    // 字号以 1080p 为设计基准，按画布高度等比缩放，跨分辨率视觉比例与 Web 版一致
+    let font_scale = (canvas.height() / 1080.0).max(0.5);
+    let name_scale = adv["nameScale"].as_f64().unwrap_or(60.0) as f32 * font_scale;
+    let status_scale = adv["statusScale"].as_f64().unwrap_or(28.0) as f32 * font_scale;
+    let time_scale = adv["timeScale"].as_f64().unwrap_or(28.0) as f32 * font_scale;
     let gap = 8.0_f32;
     let card_w = (canvas.width() - gap * (cols as f32 - 1.0)) / cols as f32;
     let rows = (sorted.len() + cols - 1) / cols;
