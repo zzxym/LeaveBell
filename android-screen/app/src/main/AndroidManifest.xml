@@ -7,6 +7,7 @@
 
     <application
         android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
         android:label="LeaveBell Screen"
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.LeaveBellScreen">
@@ -14,7 +15,6 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
             android:keepScreenOn="true">
             <intent-filter>
