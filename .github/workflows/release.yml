@@ -140,6 +140,38 @@ jobs:
             LeaveBell-screen-linux-${{ matrix.arch }}.rpm
           if-no-files-found: error
 
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        run: |
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+
+      - name: Build Android Screen APK (arm64)
+        shell: bash
+        run: |
+          curl -L --fail -o gradle.zip https://services.gradle.org/distributions/gradle-8.7-bin.zip
+          unzip -q gradle.zip -d "$RUNNER_TEMP"
+          export ANDROID_HOME="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          export PATH="$RUNNER_TEMP/gradle-8.7/bin:$PATH"
+          cd android-screen
+          gradle assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../LeaveBell-Screen-arm64-android.apk
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-arm64
+          path: LeaveBell-Screen-arm64-android.apk
+          if-no-files-found: error
+
   verify-linux:
     needs: build-linux
     runs-on: ubuntu-latest
@@ -260,7 +292,7 @@ jobs:
           Remove-Item $result -ErrorAction SilentlyContinue
 
   release:
-    needs: [build-win, build-linux, verify-linux, verify-win]
+    needs: [build-win, build-linux, verify-linux, verify-win, build-android]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
 
@@ -276,4 +308,5 @@ jobs:
             release/LeaveBell-*-windows-*.exe
             release/LeaveBell-*-linux-*.deb
             release/LeaveBell-*-linux-*.rpm
+            release/LeaveBell-Screen-arm64-android.apk
           generate_release_notes: true
