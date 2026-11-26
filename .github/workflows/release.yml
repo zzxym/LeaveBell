@@ -178,17 +178,17 @@ jobs:
           cd android-screen
           if [ -n "$LB_KEYSTORE_FILE" ]; then
             gradle assembleRelease --no-daemon
-            cp app/build/outputs/apk/release/app-release.apk ../LeaveBell-Screen-arm64-android.apk
+            cp app/build/outputs/apk/release/app-release.apk ../LeaveBell-Screen-android.apk
           else
             gradle assembleDebug --no-daemon
-            cp app/build/outputs/apk/debug/app-debug.apk ../LeaveBell-Screen-arm64-android.apk
+            cp app/build/outputs/apk/debug/app-debug.apk ../LeaveBell-Screen-android.apk
           fi
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-arm64
-          path: LeaveBell-Screen-arm64-android.apk
+          path: LeaveBell-Screen-android.apk
           if-no-files-found: error
 
   verify-linux:
@@ -327,5 +327,5 @@ jobs:
             release/LeaveBell-*-windows-*.exe
             release/LeaveBell-*-linux-*.deb
             release/LeaveBell-*-linux-*.rpm
-            release/LeaveBell-Screen-arm64-android.apk
+            release/LeaveBell-Screen-android.apk
           generate_release_notes: true
