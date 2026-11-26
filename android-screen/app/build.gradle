@@ -18,6 +18,28 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    signingConfigs {
+        release {
+            def ks = System.getenv("LB_KEYSTORE_FILE")
+            def sp = System.getenv("LB_KEYSTORE_PASSWORD")
+            def ka = System.getenv("LB_KEY_ALIAS")
+            def kp = System.getenv("LB_KEY_PASSWORD")
+            if (ks && file(ks).exists() && sp && ka && kp) {
+                storeFile file(ks)
+                storePassword sp
+                keyAlias ka
+                keyPassword kp
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
+    }
 }
 
 dependencies {

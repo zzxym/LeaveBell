@@ -154,6 +154,21 @@ jobs:
         run: |
           sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
+      - name: Prepare signing keystore
+        shell: bash
+        env:
+          LB_KEYSTORE_B64: ${{ secrets.LB_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$LB_KEYSTORE_B64" ]; then
+            echo "LB_KEYSTORE_B64 not set; will build unsigned debug APK"
+          else
+            echo "$LB_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/leavebell.jks"
+            echo "LB_KEYSTORE_FILE=$RUNNER_TEMP/leavebell.jks" >> "$GITHUB_ENV"
+            echo "LB_KEYSTORE_PASSWORD=${{ secrets.LB_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "LB_KEY_ALIAS=${{ secrets.LB_KEY_ALIAS }}" >> "$GITHUB_ENV"
+            echo "LB_KEY_PASSWORD=${{ secrets.LB_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+          fi
+
       - name: Build Android Screen APK (arm64)
         shell: bash
         run: |
@@ -162,8 +177,13 @@ jobs:
           export ANDROID_HOME="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           export PATH="$RUNNER_TEMP/gradle-8.7/bin:$PATH"
           cd android-screen
-          gradle assembleDebug --no-daemon
-          cp app/build/outputs/apk/debug/app-debug.apk ../LeaveBell-Screen-arm64-android.apk
+          if [ -n "$LB_KEYSTORE_FILE" ]; then
+            gradle assembleRelease --no-daemon
+            cp app/build/outputs/apk/release/app-release.apk ../LeaveBell-Screen-arm64-android.apk
+          else
+            gradle assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk ../LeaveBell-Screen-arm64-android.apk
+          fi
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4
