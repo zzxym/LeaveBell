@@ -33,7 +33,7 @@ jobs:
           mkdir -p offline/runtime offline/model
           curl -L --fail -o runtime.tar.bz2 "${{ matrix.runtime }}"
           tar -xjf runtime.tar.bz2 -C offline/runtime
-          curl -L --fail -o model.tar.bz2 "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-melo-tts-zh_en.tar.bz2"
+          curl -L --fail -o model.tar.bz2 "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/sherpa-onnx-vits-zh-ll.tar.bz2"
           tar -xjf model.tar.bz2 -C offline/model --strip-components=1
 
       - name: Build Windows packages
@@ -115,7 +115,7 @@ jobs:
           mkdir -p offline/runtime offline/model
           curl -L --fail -o runtime.tar.bz2 "${{ matrix.runtime }}"
           tar -xjf runtime.tar.bz2 -C offline/runtime
-          curl -L --fail -o model.tar.bz2 "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-melo-tts-zh_en.tar.bz2"
+          curl -L --fail -o model.tar.bz2 "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/sherpa-onnx-vits-zh-ll.tar.bz2"
           tar -xjf model.tar.bz2 -C offline/model --strip-components=1
 
       - name: Build Linux packages
