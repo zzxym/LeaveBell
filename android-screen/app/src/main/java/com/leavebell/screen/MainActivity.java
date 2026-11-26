@@ -39,6 +39,7 @@ public class MainActivity extends Activity {
         // 不启用 WebView 的 overview/wideViewport 缩放：页面内 fitStage() 已按屏幕等比缩放画布，
         // 两者叠加会导致班级名被双重放大溢出
         s.setTextZoom(100);
+        s.setSupportZoom(false); // 双击留给横竖版切换，不让 WebView 缩放页面
         s.setUserAgentString(s.getUserAgentString() + " LeaveBellScreen/1.0");
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);
         web.setWebChromeClient(new WebChromeClient());

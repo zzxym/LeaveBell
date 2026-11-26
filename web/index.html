@@ -18,6 +18,7 @@
   </div>
 
 <div id="ctx-menu" style="display:none;position:fixed;z-index:99999;background:rgba(17,24,39,.96);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 0;min-width:170px;box-shadow:0 8px 30px rgba(0,0,0,.45);font:15px/1.6 system-ui,sans-serif;">
+  <div id="ctx-orient" style="padding:8px 18px;cursor:pointer;">切换横竖版</div>
   <div id="ctx-exit" style="padding:8px 18px;cursor:pointer;">退出大屏</div>
 </div>
 
@@ -213,6 +214,9 @@ async function fetchDisplay() {
   const j = await r.json();
   if (j.ok) {
     displaySettings = Object.assign({ width: 1920, height: 1080, cols: 6, order: [], nameFmt: "cn", cardW: 0, cardH: 0, advanced: {} }, j.data);
+    if (localStorage.getItem("lb_portrait") === "1") {
+      [displaySettings.width, displaySettings.height] = [displaySettings.height, displaySettings.width];
+    }
     applyDisplay();
     applyFmt();
   }
@@ -457,6 +461,15 @@ setInterval(() => {
   setTimeout(autoReloadOnAssetChange, 30000);
 })();
 
+// 横竖版切换：交换画布宽高；固定块尺寸按横版设的，切换时改自动避免溢出
+function toggleOrientation() {
+  const portrait = localStorage.getItem("lb_portrait") === "1";
+  localStorage.setItem("lb_portrait", portrait ? "0" : "1");
+  [displaySettings.width, displaySettings.height] = [displaySettings.height, displaySettings.width];
+  displaySettings.cardW = 0; displaySettings.cardH = 0;
+  applyDisplay();
+}
+
 // —— 右键菜单：退出大屏 ——
 (function () {
   const menu = document.getElementById("ctx-menu");
@@ -469,6 +482,15 @@ setInterval(() => {
   });
   document.addEventListener("click", (e) => {
     if (!menu.contains(e.target)) menu.style.display = "none";
+  });
+  document.getElementById("ctx-orient").addEventListener("click", () => {
+    menu.style.display = "none";
+    toggleOrientation();
+  });
+  // Android WebView 无右键菜单：双击切换横竖版
+  document.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+    toggleOrientation();
   });
   document.getElementById("ctx-exit").addEventListener("click", () => {
     menu.style.display = "none";
