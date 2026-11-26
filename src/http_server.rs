@@ -375,6 +375,9 @@ fn handle_get(
             "/api/voice/current" => {
                 json_response(req, json!({"ok": true, "data": crate::voice::current_audio()}), 200);
             }
+            "/api/voice/pending" => {
+                json_response(req, json!({"ok": true, "data": crate::voice::take_pending_audio()}), 200);
+            }
             "/api/voice/audio" => {
                 let id = extract_query(req.url(), "id");
                 match crate::voice::audio_by_id(&id) {

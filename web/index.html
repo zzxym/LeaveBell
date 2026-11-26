@@ -400,40 +400,44 @@ applyFmt();
 fetchDisplay();
 fetchData();
 
-// SSE 推送 + 轮询兜底：SSE 在部分环境（如 Android WebView/代理）不可达，轮询保证状态与播报不丢。
+// 播报队列：逐条播完再播下一条，避免连续播报互相掐断
+const voiceQueue = [];
+let voicePlaying = false;
+function enqueueVoice(url) {
+  voiceQueue.push(url);
+  if (voicePlaying) return;
+  voicePlaying = true;
+  const playNext = () => {
+    if (!voiceQueue.length) { voicePlaying = false; return; }
+    const a = new Audio(voiceQueue.shift());
+    let advanced = false;
+    const advance = () => { if (!advanced) { advanced = true; playNext(); } };
+    a.onended = advance; a.onerror = advance;
+    a.play().catch(advance);
+  };
+  playNext();
+}
+
+// 轮询待播队列：SSE 不可用时仍能逐条播报，不丢中间条
 async function pollFallback() {
   try {
     await fetchData();
-    const r = await fetch("/api/voice/current", {cache:"no-store"});
+    const r = await fetch("/api/voice/pending", {cache:"no-store"});
     const j = await r.json();
-    const d = j.data || {};
-    if (d.audio && d.audio !== lastVoiceAudio) {
-      lastVoiceAudio = d.audio;
-      speakingCid = d.class_id || "";
-      new Audio(d.audio).play().catch(() => {});
-      renderCards();
+    const list = j.data || [];
+    for (const d of list) {
+      if (d.audio) { speakingCid = d.class_id || ""; enqueueVoice(d.audio); }
     }
+    if (list.length) renderCards();
   } catch (_) {}
 }
 setInterval(pollFallback, 1000);
 
 // update：班级状态等数据变化，只拉数据；display：布局/样式变化，重新拉设置与数据。
 const events = new EventSource("/api/events");
-let lastVoiceAudio = "";
 events.addEventListener("update", () => fetchData());
 events.addEventListener("display", () => { fetchDisplay(); fetchData(); });
-events.addEventListener("voice_start", (e) => {
-  try {
-    const d = JSON.parse(e.data || "{}");
-    speakingCid = d.class_id || "";
-    if (d.audio && d.audio !== lastVoiceAudio) {
-      lastVoiceAudio = d.audio;
-      new Audio(d.audio).play().catch(() => {});
-    }
-  } catch (_) { speakingCid = ""; }
-  renderCards();
-});
-events.addEventListener("voice_end", () => { speakingCid = ""; renderCards(); });
+// 播报改由 /api/voice/pending 轮询驱动；SSE 的 voice_start/voice_end 不再用于播放
 
 // 每秒更新已过时长，不整页重渲染
 setInterval(() => {

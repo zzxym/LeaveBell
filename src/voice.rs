@@ -365,6 +365,8 @@ struct AudioItem {
 
 static AUDIO_CACHE: OnceLock<Mutex<HashMap<String, AudioItem>>> = OnceLock::new();
 static CURRENT_AUDIO: OnceLock<Mutex<Value>> = OnceLock::new();
+/// 待大屏拉取的播报队列：SSE 不可用时保证连续点击不丢中间播报
+static PENDING_AUDIO: OnceLock<Mutex<Vec<Value>>> = OnceLock::new();
 
 /// 保存一次合成结果，返回供大屏拉取的音频 ID。
 pub fn publish_audio(bytes: Vec<u8>, mime: &'static str, class_id: &str, text: &str) -> String {
@@ -384,6 +386,10 @@ pub fn publish_audio(bytes: Vec<u8>, mime: &'static str, class_id: &str, text: &
             "audio": format!("/api/voice/audio?id={}", id)
         });
         *CURRENT_AUDIO.get_or_init(|| Mutex::new(json!({}))).lock().unwrap() = event.clone();
+        let mut pending = PENDING_AUDIO.get_or_init(|| Mutex::new(Vec::new())).lock().unwrap();
+        if pending.len() >= 50 { pending.remove(0); } // 上限防止异常堆积
+        pending.push(event.clone());
+        drop(pending);
         if let Some(send) = broadcast() { send("voice_start", &event.to_string()); }
     }
     id
@@ -399,6 +405,13 @@ pub fn current_audio() -> Value {
     CURRENT_AUDIO.get()
         .map(|v| v.lock().unwrap().clone())
         .unwrap_or_else(|| json!({}))
+}
+
+/// 取出并清空待播报队列，供大屏轮询拉取
+pub fn take_pending_audio() -> Vec<Value> {
+    PENDING_AUDIO.get()
+        .map(|v| std::mem::take(&mut *v.lock().unwrap()))
+        .unwrap_or_default()
 }
 
 /// 全局语音引擎，HTTP 层与 UI 层共用
