@@ -2,11 +2,15 @@ use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Linux deb/rpm 安装到 /opt，普通用户不可写；此时把状态文件放到用户配置目录。
+/// Linux 上若安装目录不可写（deb/rpm 装到 /opt 等），把状态文件放到用户配置目录。
 pub fn state_dir(base: &Path) -> PathBuf {
     #[cfg(target_os = "linux")]
     {
-        if base.starts_with("/opt/") {
+        // 试写探针：安装目录可写就原地放（绿色版体验不变），只读才重定向
+        let probe = base.join(".lb-write-probe");
+        let writable = fs::write(&probe, b"").is_ok();
+        if writable { let _ = fs::remove_file(&probe); }
+        if !writable {
             let root = std::env::var_os("XDG_CONFIG_HOME")
                 .map(PathBuf::from)
                 .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
@@ -14,6 +18,16 @@ pub fn state_dir(base: &Path) -> PathBuf {
             let name = base.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "LeaveBell".into());
             let dir = root.join("LeaveBell").join(name);
             let _ = fs::create_dir_all(&dir);
+            // 一次性迁移：旧版可能已在只读安装目录旁留下 data.json（若可写则已在上面返回，这里仅兜底）
+            let old = base.join("data");
+            if old.is_dir() {
+                let new_data = dir.join("data");
+                let _ = fs::create_dir_all(&new_data);
+                for entry in fs::read_dir(&old).into_iter().flatten().flatten() {
+                    let dst = new_data.join(entry.file_name());
+                    if !dst.exists() { let _ = fs::copy(entry.path(), &dst); }
+                }
+            }
             return dir;
         }
     }
