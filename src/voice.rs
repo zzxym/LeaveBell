@@ -117,11 +117,9 @@ impl VoiceEngine {
         if !model.is_file() {
             return vec![];
         }
-        // sherpa-onnx VITS（MeloTTS）：保留用户已选用的两个音色编号（前端映射为女声/男声）
-        vec![
-            "sherpa-onnx-vits-zh-ll/2".into(),
-            "sherpa-onnx-vits-zh-ll/3".into(),
-        ]
+        // sherpa-onnx VITS（MeloTTS zh-ll）：模型仅含单一女声说话人，sid 切换无效，
+        // 因此只提供唯一音色，避免前端出现误导性的男声选项。
+        vec!["sherpa-onnx-vits-zh-ll/2".into()]
     }
 
     /// 试听：读取当前设置生成一段固定文本播报（不绑定班级）
